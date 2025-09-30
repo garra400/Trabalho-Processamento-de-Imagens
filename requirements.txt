@@ -1,0 +1,12 @@
+# Dependências do projeto de processamento de imagens
+
+# Interface gráfica
+customtkinter>=5.2.0
+
+# Processamento de imagens
+Pillow>=10.0.0
+opencv-python>=4.8.0
+numpy>=1.24.0
+
+# Utilitários
+pathlib2>=2.3.7
