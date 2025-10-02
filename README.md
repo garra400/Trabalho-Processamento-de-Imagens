@@ -1,85 +1,58 @@
-# Processamento de Imagens
+# Processamento de Imagens (App Modular + Vetor de Modificações)
 
-### Organização das Pastas
+Aplicativo de processamento de imagens com interface em CustomTkinter, arquitetura modular e um Vetor de Modificações (pipeline) que encadeia transformações de forma pura a partir da imagem original.
+
+## Organização das Pastas (real)
 
 ```
-PedroModularizado/
-├── src/                                # Código fonte principal
-│   ├── config/                        # Configurações da aplicação
-│   │   ├── __init__.py
-│   │   ├── settings.py                # Configurações gerais (cores, tamanhos, etc.)
-│   │   └── constants.py               # Constantes da aplicação
-│   │
-│   ├── models/                        # Modelos de dados
-│   │   ├── __init__.py
-│   │   ├── image_model.py             # Modelo para representar imagens
-│   │   └── application_state.py       # Estado da aplicação
-│   │
-│   ├── services/                      # Lógica de negócio
-│   │   ├── __init__.py
-│   │   ├── image_processing/          # Serviços de processamento
-│   │   │   ├── __init__.py
-│   │   │   ├── color_service.py       # Conversões de cor
-│   │   │   ├── filter_service.py      # Aplicação de filtros
-│   │   │   ├── edge_service.py        # Detecção de bordas
-│   │   │   ├── binary_service.py      # Binarização
-│   │   │   └── morphology_service.py  # Operações morfológicas
-│   │   │
-│   │   └── file_management/           # Gerenciamento de arquivos
-│   │       ├── __init__.py
-│   │       ├── image_loader.py        # Carregamento de imagens
-│   │       └── image_exporter.py      # Exportação de imagens
-│   │
-│   ├── controllers/                   # Controladores (MVC)
-│   │   ├── __init__.py
-│   │   ├── main_controller.py         # Controlador principal
-│   │   └── image_controller.py        # Controlador de imagens
-│   │
-│   ├── views/                         # Interface do usuário
-│   │   ├── __init__.py
-│   │   ├── components/                # Componentes reutilizáveis
-│   │   │   ├── __init__.py
-│   │   │   ├── navigation_frame.py    # Frame de navegação
-│   │   │   ├── image_preview.py       # Preview de imagens
-│   │   │   ├── intensity_toolbar.py   # Toolbar de intensidade
-│   │   │   └── file_list.py           # Lista de arquivos
-│   │   │
-│   │   ├── pages/                     # Páginas da aplicação
-│   │   │   ├── __init__.py
-│   │   │   ├── import_page.py         # Página de importação
-│   │   │   ├── color_page.py          # Página de cores
-│   │   │   ├── filter_page.py         # Página de filtros
-│   │   │   ├── edge_page.py           # Página de bordas
-│   │   │   ├── binary_page.py         # Página de binarização
-│   │   │   └── morphology_page.py     # Página de morfologia
-│   │   │
-│   │   └── main_window.py             # Janela principal
-│   │
-│   └── utils/                         # Utilitários
-│       ├── __init__.py
-│       ├── image_utils.py             # Utilitários para imagens
-│       └── ui_utils.py                # Utilitários para UI
-│
-├── assets/                            # Recursos da aplicação
-│   └── icons/                         # Ícones
-│       ├── icone.png
-│       └── icone.ico
-│
-├── tests/                             # Testes unitários
-│   ├── __init__.py
-│   ├── test_services/
-│   ├── test_controllers/
-│   └── test_utils/
-│
-├── docs/                              # Documentação
-│   ├── README.md
-│   └── API.md
-│
-├── main.py                            # Ponto de entrada da aplicação
-└── requirements.txt                   # Dependências do projeto
+Trabalho-Processamento-de-Imagens/
+├── main.py
+├── requirements.txt
+├── README.md
+├── cofigofinal3.py
+└── src/
+	├── config/
+	├── controllers/
+	├── models/
+	├── services/
+	├── utils/
+	└── views/
 ```
 
-### Funcionalidades por Módulo
+Diretórios principais:
+- src/config: settings e constants
+- src/models: image_model, application_state, pipeline
+- src/controllers: image_controller e pipeline_controller
+- src/services: image_processing/*, file_management/* e pipeline_executor (execução pura do vetor)
+- src/views: main_window (UI principal) e basic_app (fallback)
+
+## Como executar
+
+```powershell
+python -m venv venv
+./venv/Scripts/Activate.ps1
+pip install -r requirements.txt
+python .\main.py
+```
+
+## Fluxo e Semântica do Vetor
+
+- O Vetor de Modificações é uma lista ordenada de etapas que SEMPRE é aplicada sobre a imagem original (execução pura, sem efeitos colaterais).
+- A cada mudança no vetor (adicionar, remover, reordenar), o resultado é recalculado imediatamente.
+- Se o vetor estiver vazio, a base exibida é a imagem original.
+
+Na aba Vetor:
+- Salvar Vetor: salva um snapshot das etapas para uso do “Reverter Vetor”. Não altera a imagem original importada.
+- Reverter Vetor: volta ao snapshot salvo e recalcula o resultado.
+- Exportar: exporta o resultado atual do vetor.
+
+Nas abas de operação (Cor, Filtros, Bordas, Binarização, Morfologia):
+- O seletor começa em “Selecione…”. Enquanto estiver assim, a prévia exibe apenas a base atual (vetor → ou original se vetor vazio).
+- Ao escolher a técnica, a prévia aplica a transformação sobre a base.
+- Salvar Modificações: adiciona a técnica atual ao vetor e salva snapshot (para reverter depois). O original não é alterado.
+- Resetar: volta a prévia para a base do momento (resultado do vetor, ou original quando vazio).
+
+## Funcionalidades por Módulo
 
 #### Services (Serviços)
 - **color_service.py**: Conversões RGB↔HSV, escala de cinza, etc.
@@ -89,18 +62,17 @@ PedroModularizado/
 - **morphology_service.py**: Erosão, dilatação, abertura, fechamento
 
 #### Views (Interface)
-- **navigation_frame.py**: Menu lateral de navegação
-- **image_preview.py**: Visualização de imagens
-- **intensity_toolbar.py**: Controles de intensidade e iterações
-- Páginas específicas para cada funcionalidade
+- `main_window.py`: navegação, prévias, controles dinâmicos e aba do vetor
+- `basic_app.py`: fallback simples
 
 #### Controllers (Controladores)
-- **main_controller.py**: Coordena toda a aplicação
 - **image_controller.py**: Gerencia estado das imagens
+- **pipeline_controller.py**: Gerencia etapas do vetor, snapshots e execução
 
 #### Models (Modelos)
 - **image_model.py**: Representa uma imagem e suas propriedades
 - **application_state.py**: Estado global da aplicação
+ - **pipeline.py**: Passos do vetor, snapshot/revert
 
 ### Como Desenvolver
 
@@ -116,4 +88,4 @@ PedroModularizado/
 - **Reutilização**: Componentes podem ser reutilizados
 - **Manutenibilidade**: Código mais fácil de manter e debuggar
 - **Testabilidade**: Cada módulo pode ser testado independentemente
-- **Escalabilidade**: Fácil adicionar novas funcionalidades# Trabalho-Processamento-de-Imagens
+- **Escalabilidade**: Fácil adicionar novas funcionalidades
