@@ -29,55 +29,63 @@ class ImageController:
         export_image_service(self.image_model.processed, path)
 
     # Transformações
-    def convert_color(self, conversion_type: str) -> None:
+    def convert_color(self, conversion_type: str, intensity: float | None = None, iterations: int | None = None) -> None:
         if self.image_model.original is None:
             raise ValueError("Nenhuma imagem carregada")
+        inten = self.state.intensity if intensity is None else intensity
+        iters = self.state.iterations if iterations is None else iterations
         self.image_model.processed = svc_convert_color(
             self.image_model.original.copy(),
             conversion_type,
-            self.state.intensity,
-            self.state.iterations,
+            inten,
+            iters,
         )
 
-    def apply_filter(self, filter_type: str, **kwargs) -> None:
+    def apply_filter(self, filter_type: str, intensity: float | None = None, iterations: int | None = None, **kwargs) -> None:
         if self.image_model.original is None:
             raise ValueError("Nenhuma imagem carregada")
+        inten = self.state.intensity if intensity is None else intensity
+        iters = self.state.iterations if iterations is None else iterations
         self.image_model.processed = svc_apply_filter(
             self.image_model.original.copy(),
             filter_type,
-            self.state.intensity,
-            self.state.iterations,
+            inten,
+            iters,
             **kwargs,
         )
 
-    def detect_edges(self, method: str, **kwargs) -> None:
+    def detect_edges(self, method: str, intensity: float | None = None, **kwargs) -> None:
         if self.image_model.original is None:
             raise ValueError("Nenhuma imagem carregada")
+        inten = self.state.intensity if intensity is None else intensity
         self.image_model.processed = svc_detect_edges(
             self.image_model.original.copy(),
             method,
-            self.state.intensity,
+            inten,
             **kwargs,
         )
 
-    def binarize(self, method: str, **kwargs) -> None:
+    def binarize(self, method: str, intensity: float | None = None, **kwargs) -> None:
         if self.image_model.original is None:
             raise ValueError("Nenhuma imagem carregada")
+        inten = self.state.intensity if intensity is None else intensity
         self.image_model.processed = svc_binarize(
             self.image_model.original.copy(),
             method,
-            self.state.intensity,
+            inten,
             **kwargs,
         )
 
-    def apply_morphology(self, operation: str, **kwargs) -> None:
+    def apply_morphology(self, operation: str, intensity: float | None = None, iterations: int | None = None, **kwargs) -> None:
         if self.image_model.original is None:
             raise ValueError("Nenhuma imagem carregada")
+        inten = self.state.intensity if intensity is None else intensity
+        iters = self.state.iterations if iterations is None else iterations
         self.image_model.processed = svc_apply_morphology(
             self.image_model.original.copy(),
             operation,
-            self.state.intensity,
-            self.state.iterations,
+            inten,
+            iters,
             **kwargs,
         )
 

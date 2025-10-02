@@ -139,65 +139,16 @@ class MainWindow(ctk.CTk):
         )
 
     def create_intensity_toolbar(self, parent):
-        intensity_frame = ctk.CTkFrame(parent, fg_color=("gray88", "gray20"))
-        intensity_frame.grid(row=0, column=0, columnspan=4, sticky="ew", padx=5, pady=(5, 10))
-        intensity_frame.grid_columnconfigure(1, weight=1)
-        intensity_frame.grid_columnconfigure(3, weight=1)
-
-        ctk.CTkLabel(intensity_frame, text="Intensidade:", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, padx=10, pady=5)
-
-        self.intensity_var = ctk.DoubleVar(value=self.app_state.intensity)
-        self.iterations_var = ctk.IntVar(value=self.app_state.iterations)
-
-        self.intensity_slider = ctk.CTkSlider(
-            intensity_frame,
-            from_=0.1,
-            to=3.0,
-            number_of_steps=29,
-            variable=self.intensity_var,
-            command=self.on_intensity_change,
-        )
-        self.intensity_slider.grid(row=0, column=1, sticky="ew", padx=10, pady=5)
-
-        self.intensity_label = ctk.CTkLabel(intensity_frame, text=f"{self.app_state.intensity:.1f}")
-        self.intensity_label.grid(row=0, column=2, padx=5, pady=5)
-
-        ctk.CTkLabel(intensity_frame, text="Repetições:", font=ctk.CTkFont(weight="bold")).grid(row=0, column=3, padx=(20, 10), pady=5)
-
-        self.iterations_slider = ctk.CTkSlider(
-            intensity_frame,
-            from_=1,
-            to=10,
-            number_of_steps=9,
-            variable=self.iterations_var,
-            command=self.on_iterations_change,
-        )
-        self.iterations_slider.grid(row=0, column=4, sticky="ew", padx=10, pady=5)
-
-        self.iterations_label = ctk.CTkLabel(intensity_frame, text=str(self.app_state.iterations))
-        self.iterations_label.grid(row=0, column=5, padx=5, pady=5)
+        # Mantido por compatibilidade, mas não é mais usado. Controles agora estão por técnica.
+        pass
 
     def on_intensity_change(self, value):
-        self.app_state.intensity = float(value)
-        self.intensity_label.configure(text=f"{value:.1f}")
-        # Live refresh for pages with dynamic params
-        if getattr(self, 'selected_frame_name', None) == "edge":
-            self.on_edge_param_change()
-        elif getattr(self, 'selected_frame_name', None) == "binary":
-            self.on_binary_param_change()
-        elif getattr(self, 'selected_frame_name', None) == "filter":
-            self.on_filter_param_change()
-        elif getattr(self, 'selected_frame_name', None) == "morphology":
-            self.on_morph_param_change()
+        # Deprecated: intensidade global não é mais usada
+        pass
 
     def on_iterations_change(self, value):
-        self.app_state.iterations = int(value)
-        self.iterations_label.configure(text=f"{int(value)}")
-        # Some techniques respond to iteration changes (filters/morphology)
-        if getattr(self, 'selected_frame_name', None) == "filter":
-            self.on_filter_param_change()
-        elif getattr(self, 'selected_frame_name', None) == "morphology":
-            self.on_morph_param_change()
+        # Deprecated: repetições globais não é mais usado
+        pass
 
     def setup_processing_page(self, frame, title, controls_func):
         frame.grid_rowconfigure(0, weight=1)
@@ -231,20 +182,58 @@ class MainWindow(ctk.CTk):
 
     def setup_color_page(self):
         def create_color_controls(parent):
-            parent.grid_columnconfigure((0, 1, 2, 3), weight=1)
-            self.create_intensity_toolbar(parent)
-            ctk.CTkLabel(parent, text="Conversão de Cor:", font=ctk.CTkFont(weight="bold")).grid(row=1, column=0, columnspan=4, pady=(10, 5))
-            ctk.CTkButton(parent, text="RGB para Grayscale", command=lambda: self.on_convert_color("grayscale")).grid(row=2, column=0, padx=5, pady=5)
-            ctk.CTkButton(parent, text="RGB para HSV", command=lambda: self.on_convert_color("hsv")).grid(row=2, column=1, padx=5, pady=5)
-            ctk.CTkButton(parent, text="RGB para LAB", command=lambda: self.on_convert_color("lab")).grid(row=2, column=2, padx=5, pady=5)
-            ctk.CTkButton(parent, text="Inverter Cores", command=lambda: self.on_convert_color("invert")).grid(row=2, column=3, padx=5, pady=5)
+            parent.grid_columnconfigure((0, 1, 2, 3, 4), weight=1)
+            ctk.CTkLabel(parent, text="Conversão de Cor:", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, columnspan=5, pady=(10, 5))
+
+            ctk.CTkLabel(parent, text="Técnica:").grid(row=1, column=0, padx=5, pady=5, sticky="e")
+            self.color_method_var = ctk.StringVar(value="grayscale")
+            self.color_method_option = ctk.CTkOptionMenu(parent, values=["grayscale", "hsv", "lab", "invert"], variable=self.color_method_var, command=lambda _: self.update_color_controls())
+            self.color_method_option.grid(row=1, column=1, padx=5, pady=5, sticky="w")
+
+            self.color_params_frame = ctk.CTkFrame(parent)
+            self.color_params_frame.grid(row=2, column=0, columnspan=5, sticky="ew", padx=10, pady=5)
+            self.color_params_frame.grid_columnconfigure((0, 1, 2, 3, 4), weight=1)
+
+            self.update_color_controls()
 
         self.color_image_area, self.color_image_label = self.setup_processing_page(self.color_frame, "Conversão de Cor", create_color_controls)
+
+    def update_color_controls(self):
+        for w in self.color_params_frame.winfo_children():
+            w.destroy()
+        method = self.color_method_var.get()
+
+        # Iterations sempre permitido em cor (mantém compatibilidade)
+        ctk.CTkLabel(self.color_params_frame, text="Repetições").grid(row=0, column=0, padx=5, pady=5)
+        self.color_iterations = ctk.IntVar(value=1)
+        it_slider = ctk.CTkSlider(self.color_params_frame, from_=1, to=10, number_of_steps=9, variable=self.color_iterations, command=lambda v: self.on_color_param_change())
+        it_slider.grid(row=0, column=1, sticky="ew", padx=5)
+
+        # Intensidade só para grayscale/invert (mistura/blend)
+        if method in ("grayscale", "invert"):
+            ctk.CTkLabel(self.color_params_frame, text="Intensidade").grid(row=0, column=2, padx=5, pady=5)
+            self.color_intensity = ctk.DoubleVar(value=1.0)
+            in_slider = ctk.CTkSlider(self.color_params_frame, from_=0.1, to=3.0, number_of_steps=29, variable=self.color_intensity, command=lambda v: self.on_color_param_change())
+            in_slider.grid(row=0, column=3, sticky="ew", padx=5)
+
+        self.on_color_param_change()
+
+    def on_color_param_change(self):
+        if not self.image_model.original:
+            return
+        method = self.color_method_var.get()
+        intensity = float(self.color_intensity.get()) if hasattr(self, 'color_intensity') else 1.0
+        iterations = int(self.color_iterations.get()) if hasattr(self, 'color_iterations') else 1
+        try:
+            self.controller.convert_color(method, intensity=intensity, iterations=iterations)
+            self.update_preview_image(self.color_image_label)
+        except Exception:
+            pass
 
     def setup_filter_page(self):
         def create_filter_controls(parent):
             parent.grid_columnconfigure((0, 1, 2, 3, 4), weight=1)
-            self.create_intensity_toolbar(parent)
+            # Intensidade e repetições agora fazem parte dos controles abaixo
             ctk.CTkLabel(parent, text="Filtros:", font=ctk.CTkFont(weight="bold")).grid(row=1, column=0, columnspan=5, pady=(10, 5))
 
             ctk.CTkLabel(parent, text="Técnica:").grid(row=2, column=0, padx=5, pady=5, sticky="e")
@@ -263,7 +252,7 @@ class MainWindow(ctk.CTk):
     def setup_edge_page(self):
         def create_edge_controls(parent):
             parent.grid_columnconfigure((0, 1, 2, 3, 4), weight=1)
-            self.create_intensity_toolbar(parent)
+            # Intensidade e repetições agora fazem parte dos controles abaixo
 
             ctk.CTkLabel(parent, text="Detector de Borda:", font=ctk.CTkFont(weight="bold")).grid(row=1, column=0, columnspan=5, pady=(10, 5))
 
@@ -286,7 +275,7 @@ class MainWindow(ctk.CTk):
     def setup_binary_page(self):
         def create_binary_controls(parent):
             parent.grid_columnconfigure((0, 1, 2, 3, 4), weight=1)
-            self.create_intensity_toolbar(parent)
+            # Intensidade e repetições agora fazem parte dos controles abaixo
             ctk.CTkLabel(parent, text="Binarização:", font=ctk.CTkFont(weight="bold")).grid(row=1, column=0, columnspan=5, pady=(10, 5))
 
             ctk.CTkLabel(parent, text="Técnica:").grid(row=2, column=0, padx=5, pady=5, sticky="e")
@@ -401,7 +390,7 @@ class MainWindow(ctk.CTk):
     def setup_morphology_page(self):
         def create_morphology_controls(parent):
             parent.grid_columnconfigure((0, 1, 2, 3, 4), weight=1)
-            self.create_intensity_toolbar(parent)
+            # Intensidade e repetições agora fazem parte dos controles abaixo
             ctk.CTkLabel(parent, text="Morfologia Matemática:", font=ctk.CTkFont(weight="bold")).grid(row=1, column=0, columnspan=5, pady=(10, 5))
 
             ctk.CTkLabel(parent, text="Operação:").grid(row=2, column=0, padx=5, pady=5, sticky="e")
@@ -422,13 +411,18 @@ class MainWindow(ctk.CTk):
         for w in self.filter_params_frame.winfo_children():
             w.destroy()
         method = self.filter_method_var.get()
+        # Controles comuns onde faz sentido: repetições (para filtros faz sentido)
+        ctk.CTkLabel(self.filter_params_frame, text="Repetições").grid(row=0, column=0, padx=5, pady=5)
+        self.filter_iterations = ctk.IntVar(value=1)
+        it_slider = ctk.CTkSlider(self.filter_params_frame, from_=1, to=10, number_of_steps=9, variable=self.filter_iterations, command=lambda v: self.on_filter_param_change())
+        it_slider.grid(row=0, column=1, sticky="ew", padx=5)
         if method == "blur":
-            ctk.CTkLabel(self.filter_params_frame, text="Raio").grid(row=0, column=0, padx=5, pady=5)
-            self.blur_radius = ctk.IntVar(value=max(1, int(self.app_state.intensity * 2)))
+            ctk.CTkLabel(self.filter_params_frame, text="Raio").grid(row=0, column=2, padx=5, pady=5)
+            self.blur_radius = ctk.IntVar(value=3)
             r_slider = ctk.CTkSlider(self.filter_params_frame, from_=1, to=50, number_of_steps=49, variable=self.blur_radius, command=lambda v: self.on_filter_param_change())
-            r_slider.grid(row=0, column=1, sticky="ew", padx=5)
+            r_slider.grid(row=0, column=3, sticky="ew", padx=5)
         else:
-            ctk.CTkLabel(self.filter_params_frame, text="Sem parâmetros").grid(row=0, column=0, padx=5, pady=5)
+            ctk.CTkLabel(self.filter_params_frame, text="Sem parâmetros adicionais").grid(row=0, column=2, padx=5, pady=5)
         self.on_filter_param_change()
 
     def on_filter_param_change(self):
@@ -439,7 +433,7 @@ class MainWindow(ctk.CTk):
         if method == "blur":
             kwargs = {"radius": int(self.blur_radius.get())}
         try:
-            self.controller.apply_filter(method, **kwargs)
+            self.controller.apply_filter(method, iterations=int(self.filter_iterations.get()), **kwargs)
             self.update_preview_image(self.filter_image_label)
         except Exception:
             pass
@@ -449,10 +443,14 @@ class MainWindow(ctk.CTk):
         for w in self.morph_params_frame.winfo_children():
             w.destroy()
         ctk.CTkLabel(self.morph_params_frame, text="Kernel Size").grid(row=0, column=0, padx=5, pady=5)
-        default_ks = max(3, int(5 * self.app_state.intensity))
-        self.morph_kernel = ctk.IntVar(value=default_ks)
+        self.morph_kernel = ctk.IntVar(value=5)
         ks_slider = ctk.CTkSlider(self.morph_params_frame, from_=1, to=51, number_of_steps=50, variable=self.morph_kernel, command=lambda v: self.on_morph_param_change())
         ks_slider.grid(row=0, column=1, sticky="ew", padx=5)
+
+        ctk.CTkLabel(self.morph_params_frame, text="Repetições").grid(row=0, column=2, padx=5, pady=5)
+        self.morph_iterations = ctk.IntVar(value=1)
+        it_slider = ctk.CTkSlider(self.morph_params_frame, from_=1, to=10, number_of_steps=9, variable=self.morph_iterations, command=lambda v: self.on_morph_param_change())
+        it_slider.grid(row=0, column=3, sticky="ew", padx=5)
         self.on_morph_param_change()
 
     def on_morph_param_change(self):
@@ -461,7 +459,7 @@ class MainWindow(ctk.CTk):
         op = self.morph_method_var.get()
         ks = int(self.morph_kernel.get())
         try:
-            self.controller.apply_morphology(op, kernel_size=max(1, ks))
+            self.controller.apply_morphology(op, kernel_size=max(1, ks), iterations=int(self.morph_iterations.get()))
             self.update_preview_image(self.morphology_image_label)
         except Exception:
             pass
@@ -595,10 +593,6 @@ class MainWindow(ctk.CTk):
     def reset_image(self):
         if self.image_model.original:
             self.controller.reset_image()
-            self.intensity_var.set(1.0)
-            self.iterations_var.set(1)
-            self.on_intensity_change(1.0)
-            self.on_iterations_change(1)
             if self.selected_frame_name == "color":
                 self.update_preview_image(self.color_image_label)
             elif self.selected_frame_name == "filter":
