@@ -1,4 +1,4 @@
-# Pedro Modularizado - Processamento de Imagens
+# Processamento de Imagens
 
 ## Estrutura do Projeto
 
