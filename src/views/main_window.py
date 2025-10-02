@@ -174,7 +174,6 @@ class MainWindow(ctk.CTk):
         if toolbar is not None:
             toolbar.grid_columnconfigure(10, weight=1)
             ctk.CTkButton(toolbar, text="Exportar", command=self.export_image).grid(row=0, column=0, padx=6, pady=8)
-            ctk.CTkButton(toolbar, text="Resetar", command=self.on_pipeline_reset).grid(row=0, column=1, padx=6, pady=8)
 
     def create_intensity_toolbar(self, parent):
         # Mantido por compatibilidade, mas não é mais usado. Controles agora estão por técnica.
@@ -228,8 +227,8 @@ class MainWindow(ctk.CTk):
             parent.grid_columnconfigure((0, 1, 2), weight=1)
             ctk.CTkLabel(parent, text="Conversão de Cor:", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, columnspan=3, pady=(10, 5))
 
-            self.color_method_var = ctk.StringVar(value="grayscale")
-            self.color_method_option = ctk.CTkOptionMenu(parent, values=["grayscale", "hsv", "lab", "invert"], variable=self.color_method_var, command=lambda _: self.update_color_controls())
+            self.color_method_var = ctk.StringVar(value="Selecione…")
+            self.color_method_option = ctk.CTkOptionMenu(parent, values=["Selecione…", "grayscale", "hsv", "lab", "invert"], variable=self.color_method_var, command=lambda _: self.update_color_controls())
             self.color_method_option.grid(row=1, column=1, padx=5, pady=5)
 
             self.color_params_frame = ctk.CTkFrame(parent)
@@ -244,8 +243,14 @@ class MainWindow(ctk.CTk):
         for w in self.color_params_frame.winfo_children():
             w.destroy()
         method = self.color_method_var.get()
-        # Sem parâmetros (determinístico). Não mostra mensagem; apenas mantém espaço limpo.
-        pass
+        # Se nada selecionado, só mostrar a base
+        if method == "Selecione…":
+            if self.image_model.original:
+                base = self.get_pipeline_base()
+                if base is not None:
+                    self.image_model.processed = base.copy()
+                    self.update_preview_image(self.color_image_label)
+            return
 
         self.on_color_param_change()
 
@@ -253,6 +258,13 @@ class MainWindow(ctk.CTk):
         if not self.image_model.original:
             return
         method = self.color_method_var.get()
+        if method == "Selecione…":
+            base = self.get_pipeline_base()
+            if base is None:
+                return
+            self.image_model.processed = base.copy()
+            self.update_preview_image(self.color_image_label)
+            return
         try:
             base = self.get_pipeline_base()
             if base is None:
@@ -271,8 +283,8 @@ class MainWindow(ctk.CTk):
             ctk.CTkLabel(parent, text="Filtros:", font=ctk.CTkFont(weight="bold")).grid(row=1, column=0, columnspan=5, pady=(10, 5))
 
             ctk.CTkLabel(parent, text="Técnica:").grid(row=2, column=2, padx=5, pady=5, sticky="e")
-            self.filter_method_var = ctk.StringVar(value="blur")
-            self.filter_method_option = ctk.CTkOptionMenu(parent, values=["blur", "sharpen", "emboss", "smooth"], variable=self.filter_method_var, command=lambda _: self.update_filter_controls())
+            self.filter_method_var = ctk.StringVar(value="Selecione…")
+            self.filter_method_option = ctk.CTkOptionMenu(parent, values=["Selecione…", "blur", "sharpen", "emboss", "smooth"], variable=self.filter_method_var, command=lambda _: self.update_filter_controls())
             self.filter_method_option.grid(row=2, column=3, padx=5, pady=5, sticky="w")
 
             self.filter_params_frame = ctk.CTkFrame(parent)
@@ -292,8 +304,8 @@ class MainWindow(ctk.CTk):
 
             # Seletor de técnica
             ctk.CTkLabel(parent, text="Técnica:").grid(row=2, column=2, padx=5, pady=5, sticky="e")
-            self.edge_method_var = ctk.StringVar(value="canny")
-            self.edge_method_option = ctk.CTkOptionMenu(parent, values=["canny", "sobel", "laplacian"], variable=self.edge_method_var, command=lambda _: self.update_edge_controls())
+            self.edge_method_var = ctk.StringVar(value="Selecione…")
+            self.edge_method_option = ctk.CTkOptionMenu(parent, values=["Selecione…", "canny", "sobel", "laplacian"], variable=self.edge_method_var, command=lambda _: self.update_edge_controls())
             self.edge_method_option.grid(row=2, column=3, padx=5, pady=5, sticky="w")
 
             # Parâmetros dinâmicos
@@ -313,8 +325,8 @@ class MainWindow(ctk.CTk):
             ctk.CTkLabel(parent, text="Binarização:", font=ctk.CTkFont(weight="bold")).grid(row=1, column=0, columnspan=5, pady=(10, 5))
 
             ctk.CTkLabel(parent, text="Técnica:").grid(row=2, column=2, padx=5, pady=5, sticky="e")
-            self.binary_method_var = ctk.StringVar(value="simple")
-            self.binary_method_option = ctk.CTkOptionMenu(parent, values=["simple", "adaptive", "otsu"], variable=self.binary_method_var, command=lambda _: self.update_binary_controls())
+            self.binary_method_var = ctk.StringVar(value="Selecione…")
+            self.binary_method_option = ctk.CTkOptionMenu(parent, values=["Selecione…", "simple", "adaptive", "otsu"], variable=self.binary_method_var, command=lambda _: self.update_binary_controls())
             self.binary_method_option.grid(row=2, column=3, padx=5, pady=5, sticky="w")
 
             self.binary_params_frame = ctk.CTkFrame(parent)
@@ -331,6 +343,13 @@ class MainWindow(ctk.CTk):
             w.destroy()
 
         method = self.edge_method_var.get()
+        if method == "Selecione…":
+            if self.image_model.original:
+                base = self.get_pipeline_base()
+                if base is not None:
+                    self.image_model.processed = base.copy()
+                    self.update_preview_image(self.edge_image_label)
+            return
 
         if method == "canny":  # sem repetições
             ctk.CTkLabel(self.edge_params_frame, text="Low Threshold").grid(row=0, column=0, padx=5, pady=5)
@@ -414,6 +433,13 @@ class MainWindow(ctk.CTk):
             w.destroy()
 
         method = self.binary_method_var.get()
+        if method == "Selecione…":
+            if self.image_model.original:
+                base = self.get_pipeline_base()
+                if base is not None:
+                    self.image_model.processed = base.copy()
+                    self.update_preview_image(self.binary_image_label)
+            return
 
         if method == "simple":
             # Centralizar único parâmetro
@@ -473,8 +499,8 @@ class MainWindow(ctk.CTk):
             ctk.CTkLabel(parent, text="Morfologia Matemática:", font=ctk.CTkFont(weight="bold")).grid(row=1, column=0, columnspan=5, pady=(10, 5))
 
             ctk.CTkLabel(parent, text="Operação:").grid(row=2, column=2, padx=5, pady=5, sticky="e")
-            self.morph_method_var = ctk.StringVar(value="erosion")
-            self.morph_method_option = ctk.CTkOptionMenu(parent, values=["erosion", "dilation", "opening", "closing"], variable=self.morph_method_var, command=lambda _: self.update_morphology_controls())
+            self.morph_method_var = ctk.StringVar(value="Selecione…")
+            self.morph_method_option = ctk.CTkOptionMenu(parent, values=["Selecione…", "erosion", "dilation", "opening", "closing"], variable=self.morph_method_var, command=lambda _: self.update_morphology_controls())
             self.morph_method_option.grid(row=2, column=3, padx=5, pady=5, sticky="w")
 
             self.morph_params_frame = ctk.CTkFrame(parent)
@@ -490,6 +516,13 @@ class MainWindow(ctk.CTk):
         for w in self.filter_params_frame.winfo_children():
             w.destroy()
         method = self.filter_method_var.get()
+        if method == "Selecione…":
+            if self.image_model.original:
+                base = self.get_pipeline_base()
+                if base is not None:
+                    self.image_model.processed = base.copy()
+                    self.update_preview_image(self.filter_image_label)
+            return
         # Controles comuns onde faz sentido: repetições (para filtros faz sentido)
         ctk.CTkLabel(self.filter_params_frame, text="Repetições").grid(row=0, column=0, padx=5, pady=5)
         self.filter_iterations = ctk.IntVar(value=1)
@@ -521,6 +554,12 @@ class MainWindow(ctk.CTk):
         if not self.image_model.original:
             return
         method = self.filter_method_var.get()
+        if method == "Selecione…":
+            base = self.get_pipeline_base()
+            if base is not None:
+                self.image_model.processed = base.copy()
+                self.update_preview_image(self.filter_image_label)
+            return
         kwargs = {}
         if method == "blur":
             kwargs = {"radius": int(self.blur_radius.get())}
@@ -538,6 +577,13 @@ class MainWindow(ctk.CTk):
     def update_morphology_controls(self):
         for w in self.morph_params_frame.winfo_children():
             w.destroy()
+        if self.morph_method_var.get() == "Selecione…":
+            if self.image_model.original:
+                base = self.get_pipeline_base()
+                if base is not None:
+                    self.image_model.processed = base.copy()
+                    self.update_preview_image(self.morphology_image_label)
+            return
         ctk.CTkLabel(self.morph_params_frame, text="Kernel Size").grid(row=0, column=0, padx=5, pady=5)
         self.morph_kernel = ctk.IntVar(value=5)
         ks_slider = ctk.CTkSlider(self.morph_params_frame, from_=1, to=51, number_of_steps=50, variable=self.morph_kernel, command=lambda v: self.on_morph_param_change())
@@ -712,24 +758,7 @@ class MainWindow(ctk.CTk):
         except Exception as e:
             messagebox.showerror("Erro", f"Erro ao reverter vetor: {str(e)}")
 
-    def on_pipeline_reset(self):
-        """Resetar (na aba do vetor) descarta alterações não salvas e volta ao snapshot."""
-        if not self.image_model.original:
-            messagebox.showwarning("Aviso", "Carregue uma imagem primeiro!")
-            return
-        try:
-            self.pipeline_controller.revert()
-            # Atualizar a imagem processada conforme o vetor revertido
-            if self.pipeline.steps:
-                result = self.pipeline_controller.run(self.image_model.original)
-                self.image_model.processed = result
-            else:
-                self.image_model.processed = self.image_model.original.copy()
-            self.refresh_pipeline_list()
-            self.update_pipeline_preview()
-            messagebox.showinfo("Resetado", "Alterações do vetor nesta aba foram descartadas.")
-        except Exception as e:
-            messagebox.showerror("Erro", f"Erro ao resetar vetor: {str(e)}")
+    
 
     # Removido: rodar vetor é intrínseco e a prévia já é atualizada automaticamente
 
