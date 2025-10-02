@@ -182,17 +182,17 @@ class MainWindow(ctk.CTk):
 
     def setup_color_page(self):
         def create_color_controls(parent):
-            parent.grid_columnconfigure((0, 1, 2, 3, 4), weight=1)
-            ctk.CTkLabel(parent, text="Conversão de Cor:", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, columnspan=5, pady=(10, 5))
+            # 3 colunas para centralizar o seletor na coluna do meio
+            parent.grid_columnconfigure((0, 1, 2), weight=1)
+            ctk.CTkLabel(parent, text="Conversão de Cor:", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, columnspan=3, pady=(10, 5))
 
-            ctk.CTkLabel(parent, text="Técnica:").grid(row=1, column=0, padx=5, pady=5, sticky="e")
             self.color_method_var = ctk.StringVar(value="grayscale")
             self.color_method_option = ctk.CTkOptionMenu(parent, values=["grayscale", "hsv", "lab", "invert"], variable=self.color_method_var, command=lambda _: self.update_color_controls())
-            self.color_method_option.grid(row=1, column=1, padx=5, pady=5, sticky="w")
+            self.color_method_option.grid(row=1, column=1, padx=5, pady=5)
 
             self.color_params_frame = ctk.CTkFrame(parent)
-            self.color_params_frame.grid(row=2, column=0, columnspan=5, sticky="ew", padx=10, pady=5)
-            self.color_params_frame.grid_columnconfigure((0, 1, 2, 3, 4), weight=1)
+            self.color_params_frame.grid(row=2, column=0, columnspan=3, sticky="nsew", padx=10, pady=5)
+            self.color_params_frame.grid_columnconfigure((0, 1, 2), weight=1)
 
             self.update_color_controls()
 
@@ -202,9 +202,8 @@ class MainWindow(ctk.CTk):
         for w in self.color_params_frame.winfo_children():
             w.destroy()
         method = self.color_method_var.get()
-
-        # Conversões são determinísticas: sem intensidade nem repetições
-        ctk.CTkLabel(self.color_params_frame, text="Sem parâmetros para conversão de cor.").grid(row=0, column=0, padx=5, pady=5)
+        # Sem parâmetros (determinístico). Não mostra mensagem; apenas mantém espaço limpo.
+        pass
 
         self.on_color_param_change()
 
@@ -297,13 +296,26 @@ class MainWindow(ctk.CTk):
             high_slider = ctk.CTkSlider(self.edge_params_frame, from_=0, to=255, number_of_steps=255, variable=self.canny_high, command=lambda v: self.on_edge_param_change())
             high_slider.grid(row=0, column=3, sticky="ew", padx=5)
         else:  # sobel/laplacian, sem repetições
-            ctk.CTkLabel(self.edge_params_frame, text="Kernel Size").grid(row=0, column=0, padx=5, pady=5)
+            # Preparar 6 colunas para centralização quando aplicável
+            for c in range(6):
+                try:
+                    self.edge_params_frame.grid_columnconfigure(c, weight=1)
+                except Exception:
+                    pass
+
+            # Para Laplacian: um único parâmetro -> centralizar (col=2 e col=3)
+            # Para Sobel: exibimos também dx/dy, então não será centralizado simples
+            start_col = 2 if method == "laplacian" else 0
+            label_col = start_col
+            slider_col = start_col + 1
+
+            ctk.CTkLabel(self.edge_params_frame, text="Kernel Size").grid(row=0, column=label_col, padx=5, pady=5)
             default_k = max(3, int(3 * self.app_state.intensity))
             if default_k % 2 == 0:
                 default_k += 1
             self.edge_ksize = ctk.IntVar(value=default_k)
             k_slider = ctk.CTkSlider(self.edge_params_frame, from_=1, to=31, number_of_steps=30, variable=self.edge_ksize, command=lambda v: self.on_edge_param_change())
-            k_slider.grid(row=0, column=1, sticky="ew", padx=5)
+            k_slider.grid(row=0, column=slider_col, sticky="ew", padx=5)
 
             if method == "sobel":
                 ctk.CTkLabel(self.edge_params_frame, text="dx").grid(row=0, column=2, padx=5, pady=5)
@@ -353,10 +365,16 @@ class MainWindow(ctk.CTk):
         method = self.binary_method_var.get()
 
         if method == "simple":
-            ctk.CTkLabel(self.binary_params_frame, text="Threshold").grid(row=0, column=0, padx=5, pady=5)
+            # Centralizar único parâmetro
+            for c in range(5):
+                try:
+                    self.binary_params_frame.grid_columnconfigure(c, weight=1)
+                except Exception:
+                    pass
+            ctk.CTkLabel(self.binary_params_frame, text="Threshold").grid(row=0, column=2, padx=5, pady=5)
             self.binary_threshold = ctk.IntVar(value=int(127 * self.app_state.intensity))
             t_slider = ctk.CTkSlider(self.binary_params_frame, from_=0, to=255, number_of_steps=255, variable=self.binary_threshold, command=lambda v: self.on_binary_param_change())
-            t_slider.grid(row=0, column=1, sticky="ew", padx=5)
+            t_slider.grid(row=0, column=3, sticky="ew", padx=5)
         elif method == "adaptive":
             ctk.CTkLabel(self.binary_params_frame, text="Block Size").grid(row=0, column=0, padx=5, pady=5)
             default_bs = max(3, int(11 * self.app_state.intensity))
@@ -428,7 +446,20 @@ class MainWindow(ctk.CTk):
             r_slider = ctk.CTkSlider(self.filter_params_frame, from_=1, to=50, number_of_steps=49, variable=self.blur_radius, command=lambda v: self.on_filter_param_change())
             r_slider.grid(row=0, column=3, sticky="ew", padx=5)
         else:
-            ctk.CTkLabel(self.filter_params_frame, text="Sem parâmetros adicionais").grid(row=0, column=2, padx=5, pady=5)
+            # Centralizar quando só houver repetições
+            for c in range(5):
+                try:
+                    self.filter_params_frame.grid_columnconfigure(c, weight=1)
+                except Exception:
+                    pass
+            # mover repetições para o centro: colunas 2 e 3
+            # relocar widgets criando novamente nesta posição
+            for w in self.filter_params_frame.grid_slaves(row=0):
+                w.grid_forget()
+            ctk.CTkLabel(self.filter_params_frame, text="Repetições").grid(row=0, column=2, padx=5, pady=5)
+            self.filter_iterations = ctk.IntVar(value=self.filter_iterations.get() if hasattr(self, 'filter_iterations') else 1)
+            it_slider = ctk.CTkSlider(self.filter_params_frame, from_=1, to=10, number_of_steps=9, variable=self.filter_iterations, command=lambda v: self.on_filter_param_change())
+            it_slider.grid(row=0, column=3, sticky="ew", padx=5)
         self.on_filter_param_change()
 
     def on_filter_param_change(self):
