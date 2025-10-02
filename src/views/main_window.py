@@ -8,6 +8,13 @@ from config.constants import SUPPORTED_IMAGE_TYPES, EXPORT_TYPES, PREVIEW_MAX_SI
 from models.image_model import ImageModel
 from models.application_state import ApplicationState
 from controllers.image_controller import ImageController
+from models.pipeline import Pipeline
+from controllers.pipeline_controller import PipelineController
+from services.image_processing.color_service import convert_color as svc_convert_color
+from services.image_processing.filter_service import apply_filter as svc_apply_filter
+from services.image_processing.edge_service import detect_edges as svc_detect_edges
+from services.image_processing.binary_service import binarize as svc_binarize
+from services.image_processing.morphology_service import apply_morphology as svc_apply_morphology
 
 
 class MainWindow(ctk.CTk):
@@ -21,6 +28,8 @@ class MainWindow(ctk.CTk):
         self.image_model = ImageModel()
         self.app_state = ApplicationState()
         self.controller = ImageController(self.image_model, self.app_state)
+        self.pipeline = Pipeline()
+        self.pipeline_controller = PipelineController(self.controller, self.pipeline)
 
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=1)
@@ -35,7 +44,7 @@ class MainWindow(ctk.CTk):
         # Frame de navegação
         self.navigation_frame = ctk.CTkFrame(self, corner_radius=0, width=180, fg_color=("gray75", "gray25"))
         self.navigation_frame.grid(row=0, column=0, sticky="ns")
-        self.navigation_frame.grid_rowconfigure(7, weight=1)
+        self.navigation_frame.grid_rowconfigure(8, weight=1)
 
         # Frame principal
         self.main_frame = ctk.CTkFrame(self, corner_radius=0, fg_color=("gray90", "gray15"))
@@ -66,11 +75,12 @@ class MainWindow(ctk.CTk):
     def create_navigation_buttons(self):
         buttons_config = [
             ("import", "Importar Imagem", 1),
-            ("color", "Conversão de Cor", 2),
-            ("filter", "Filtros", 3),
-            ("edge", "Detector de Borda", 4),
-            ("binary", "Binarização", 5),
-            ("morphology", "Morfologia", 6),
+            ("pipeline", "Vetor de Modificações", 2),
+            ("color", "Conversão de Cor", 3),
+            ("filter", "Filtros", 4),
+            ("edge", "Detector de Borda", 5),
+            ("binary", "Binarização", 6),
+            ("morphology", "Morfologia", 7),
         ]
 
         self.nav_buttons = {}
@@ -97,6 +107,7 @@ class MainWindow(ctk.CTk):
         self.edge_frame = ctk.CTkFrame(self.main_frame, corner_radius=0, fg_color="transparent")
         self.binary_frame = ctk.CTkFrame(self.main_frame, corner_radius=0, fg_color="transparent")
         self.morphology_frame = ctk.CTkFrame(self.main_frame, corner_radius=0, fg_color="transparent")
+        self.pipeline_frame = ctk.CTkFrame(self.main_frame, corner_radius=0, fg_color="transparent")
 
         self.setup_import_page()
         self.setup_color_page()
@@ -104,11 +115,13 @@ class MainWindow(ctk.CTk):
         self.setup_edge_page()
         self.setup_binary_page()
         self.setup_morphology_page()
+        self.setup_pipeline_page()
 
     def setup_import_page(self):
         self.import_frame.grid_rowconfigure(0, weight=1)
         self.import_frame.grid_rowconfigure(1, weight=0)
         self.import_frame.grid_rowconfigure(2, weight=0)
+        self.import_frame.grid_rowconfigure(3, weight=0)
         self.import_frame.grid_columnconfigure(0, weight=1)
 
         self.import_image_area = ctk.CTkFrame(self.import_frame, fg_color=("gray95", "gray10"))
@@ -134,9 +147,34 @@ class MainWindow(ctk.CTk):
         self.import_files_strip.grid(row=2, column=0, sticky="nsew", padx=10, pady=(5, 10))
         self.import_files_strip.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkLabel(self.import_files_strip, text="Nenhum arquivo importado", anchor="w").grid(
-            row=0, column=0, sticky="ew", padx=10, pady=6
+    def setup_pipeline_page(self):
+        def create_pipeline_controls(parent):
+            parent.grid_columnconfigure(0, weight=1)
+            # Lista de etapas
+            self.pipeline_list = ctk.CTkScrollableFrame(parent, fg_color=("gray92", "gray18"))
+            self.pipeline_list.grid(row=0, column=0, sticky="nsew", padx=10, pady=(10, 5))
+            self.pipeline_list.grid_columnconfigure(0, weight=1)
+
+            # Barra de ações
+            actions = ctk.CTkFrame(parent, height=48, fg_color=("gray90", "gray15"))
+            actions.grid(row=1, column=0, sticky="ew", padx=10, pady=(5, 10))
+            actions.grid_columnconfigure((0, 1, 2), weight=1)
+
+            ctk.CTkButton(actions, text="Salvar Vetor", command=self.on_pipeline_save).grid(row=0, column=0, padx=6, pady=8)
+            ctk.CTkButton(actions, text="Reverter Vetor", command=self.on_pipeline_revert).grid(row=0, column=1, padx=6, pady=8)
+            ctk.CTkLabel(actions, text="O resultado do vetor aparece acima.").grid(row=0, column=2, padx=6, pady=8)
+
+        # Reutiliza o mesmo layout das outras páginas, porém com toolbar personalizada (sem 'Salvar Modificações')
+        self.pipeline_image_area, self.pipeline_image_label = self.setup_processing_page(
+            self.pipeline_frame, "Vetor de Modificações", create_pipeline_controls, include_default_toolbar=False
         )
+
+        # Adiciona apenas os botões necessários na toolbar do pipeline
+        toolbar = getattr(self.pipeline_frame, "_toolbar", None)
+        if toolbar is not None:
+            toolbar.grid_columnconfigure(10, weight=1)
+            ctk.CTkButton(toolbar, text="Exportar", command=self.export_image).grid(row=0, column=0, padx=6, pady=8)
+            ctk.CTkButton(toolbar, text="Resetar", command=self.on_pipeline_reset).grid(row=0, column=1, padx=6, pady=8)
 
     def create_intensity_toolbar(self, parent):
         # Mantido por compatibilidade, mas não é mais usado. Controles agora estão por técnica.
@@ -150,7 +188,7 @@ class MainWindow(ctk.CTk):
         # Deprecated: repetições globais não é mais usado
         pass
 
-    def setup_processing_page(self, frame, title, controls_func):
+    def setup_processing_page(self, frame, title, controls_func, include_default_toolbar: bool = True):
         frame.grid_rowconfigure(0, weight=1)
         frame.grid_rowconfigure(1, weight=0)
         frame.grid_rowconfigure(2, weight=0)
@@ -169,9 +207,13 @@ class MainWindow(ctk.CTk):
         toolbar.grid(row=1, column=0, sticky="ew", padx=10, pady=5)
         toolbar.grid_columnconfigure(10, weight=1)
 
-        ctk.CTkButton(toolbar, text="Salvar Modificações", command=self.save_modifications).grid(row=0, column=0, padx=(10, 6), pady=8)
-        ctk.CTkButton(toolbar, text="Exportar", command=self.export_image).grid(row=0, column=1, padx=6, pady=8)
-        ctk.CTkButton(toolbar, text="Resetar", command=self.reset_image).grid(row=0, column=2, padx=6, pady=8)
+        # Expor a toolbar no frame para customizações (ex.: página do pipeline)
+        frame._toolbar = toolbar
+
+        if include_default_toolbar:
+            ctk.CTkButton(toolbar, text="Salvar Modificações", command=self.save_modifications).grid(row=0, column=0, padx=(10, 6), pady=8)
+            ctk.CTkButton(toolbar, text="Exportar", command=self.export_image).grid(row=0, column=1, padx=6, pady=8)
+            ctk.CTkButton(toolbar, text="Resetar", command=self.reset_image).grid(row=0, column=2, padx=6, pady=8)
 
         controls_frame = ctk.CTkFrame(frame, height=160, fg_color=("gray92", "gray18"))
         controls_frame.grid(row=2, column=0, sticky="nsew", padx=10, pady=(5, 10))
@@ -212,7 +254,12 @@ class MainWindow(ctk.CTk):
             return
         method = self.color_method_var.get()
         try:
-            self.controller.convert_color(method)
+            base = self.get_pipeline_base()
+            if base is None:
+                return
+            # Usar serviço puro para prévia baseada no vetor
+            result = svc_convert_color(base, method, intensity=self.app_state.intensity, iterations=self.app_state.iterations)
+            self.image_model.processed = result
             self.update_preview_image(self.color_image_label)
         except Exception:
             pass
@@ -220,13 +267,13 @@ class MainWindow(ctk.CTk):
     def setup_filter_page(self):
         def create_filter_controls(parent):
             parent.grid_columnconfigure((0, 1, 2, 3, 4), weight=1)
-            # Intensidade e repetições agora fazem parte dos controles abaixo
+            # Título e centralização da técnica
             ctk.CTkLabel(parent, text="Filtros:", font=ctk.CTkFont(weight="bold")).grid(row=1, column=0, columnspan=5, pady=(10, 5))
 
-            ctk.CTkLabel(parent, text="Técnica:").grid(row=2, column=0, padx=5, pady=5, sticky="e")
+            ctk.CTkLabel(parent, text="Técnica:").grid(row=2, column=2, padx=5, pady=5, sticky="e")
             self.filter_method_var = ctk.StringVar(value="blur")
             self.filter_method_option = ctk.CTkOptionMenu(parent, values=["blur", "sharpen", "emboss", "smooth"], variable=self.filter_method_var, command=lambda _: self.update_filter_controls())
-            self.filter_method_option.grid(row=2, column=1, padx=5, pady=5, sticky="w")
+            self.filter_method_option.grid(row=2, column=3, padx=5, pady=5, sticky="w")
 
             self.filter_params_frame = ctk.CTkFrame(parent)
             self.filter_params_frame.grid(row=3, column=0, columnspan=5, sticky="ew", padx=10, pady=5)
@@ -244,10 +291,10 @@ class MainWindow(ctk.CTk):
             ctk.CTkLabel(parent, text="Detector de Borda:", font=ctk.CTkFont(weight="bold")).grid(row=1, column=0, columnspan=5, pady=(10, 5))
 
             # Seletor de técnica
-            ctk.CTkLabel(parent, text="Técnica:").grid(row=2, column=0, padx=5, pady=5, sticky="e")
+            ctk.CTkLabel(parent, text="Técnica:").grid(row=2, column=2, padx=5, pady=5, sticky="e")
             self.edge_method_var = ctk.StringVar(value="canny")
             self.edge_method_option = ctk.CTkOptionMenu(parent, values=["canny", "sobel", "laplacian"], variable=self.edge_method_var, command=lambda _: self.update_edge_controls())
-            self.edge_method_option.grid(row=2, column=1, padx=5, pady=5, sticky="w")
+            self.edge_method_option.grid(row=2, column=3, padx=5, pady=5, sticky="w")
 
             # Parâmetros dinâmicos
             self.edge_params_frame = ctk.CTkFrame(parent)
@@ -265,10 +312,10 @@ class MainWindow(ctk.CTk):
             # Intensidade e repetições agora fazem parte dos controles abaixo
             ctk.CTkLabel(parent, text="Binarização:", font=ctk.CTkFont(weight="bold")).grid(row=1, column=0, columnspan=5, pady=(10, 5))
 
-            ctk.CTkLabel(parent, text="Técnica:").grid(row=2, column=0, padx=5, pady=5, sticky="e")
+            ctk.CTkLabel(parent, text="Técnica:").grid(row=2, column=2, padx=5, pady=5, sticky="e")
             self.binary_method_var = ctk.StringVar(value="simple")
             self.binary_method_option = ctk.CTkOptionMenu(parent, values=["simple", "adaptive", "otsu"], variable=self.binary_method_var, command=lambda _: self.update_binary_controls())
-            self.binary_method_option.grid(row=2, column=1, padx=5, pady=5, sticky="w")
+            self.binary_method_option.grid(row=2, column=3, padx=5, pady=5, sticky="w")
 
             self.binary_params_frame = ctk.CTkFrame(parent)
             self.binary_params_frame.grid(row=3, column=0, columnspan=5, sticky="ew", padx=10, pady=5)
@@ -352,7 +399,11 @@ class MainWindow(ctk.CTk):
                     dx, dy = 1, 0
                 kwargs.update({"dx": dx, "dy": dy})
         try:
-            self.controller.detect_edges(method, **kwargs)
+            base = self.get_pipeline_base()
+            if base is None:
+                return
+            result = svc_detect_edges(base, method, intensity=self.app_state.intensity, **kwargs)
+            self.image_model.processed = result
             self.update_preview_image(self.edge_image_label)
         except Exception:
             pass
@@ -406,7 +457,11 @@ class MainWindow(ctk.CTk):
                 bs += 1
             kwargs = {"block_size": max(3, bs), "C": int(self.binary_C.get())}
         try:
-            self.controller.binarize(method, **kwargs)
+            base = self.get_pipeline_base()
+            if base is None:
+                return
+            result = svc_binarize(base, method, intensity=self.app_state.intensity, **kwargs)
+            self.image_model.processed = result
             self.update_preview_image(self.binary_image_label)
         except Exception:
             pass
@@ -417,10 +472,10 @@ class MainWindow(ctk.CTk):
             # Intensidade e repetições agora fazem parte dos controles abaixo
             ctk.CTkLabel(parent, text="Morfologia Matemática:", font=ctk.CTkFont(weight="bold")).grid(row=1, column=0, columnspan=5, pady=(10, 5))
 
-            ctk.CTkLabel(parent, text="Operação:").grid(row=2, column=0, padx=5, pady=5, sticky="e")
+            ctk.CTkLabel(parent, text="Operação:").grid(row=2, column=2, padx=5, pady=5, sticky="e")
             self.morph_method_var = ctk.StringVar(value="erosion")
             self.morph_method_option = ctk.CTkOptionMenu(parent, values=["erosion", "dilation", "opening", "closing"], variable=self.morph_method_var, command=lambda _: self.update_morphology_controls())
-            self.morph_method_option.grid(row=2, column=1, padx=5, pady=5, sticky="w")
+            self.morph_method_option.grid(row=2, column=3, padx=5, pady=5, sticky="w")
 
             self.morph_params_frame = ctk.CTkFrame(parent)
             self.morph_params_frame.grid(row=3, column=0, columnspan=5, sticky="ew", padx=10, pady=5)
@@ -470,7 +525,11 @@ class MainWindow(ctk.CTk):
         if method == "blur":
             kwargs = {"radius": int(self.blur_radius.get())}
         try:
-            self.controller.apply_filter(method, iterations=int(self.filter_iterations.get()), **kwargs)
+            base = self.get_pipeline_base()
+            if base is None:
+                return
+            result = svc_apply_filter(base, method, intensity=self.app_state.intensity, iterations=int(self.filter_iterations.get()), **kwargs)
+            self.image_model.processed = result
             self.update_preview_image(self.filter_image_label)
         except Exception:
             pass
@@ -496,10 +555,24 @@ class MainWindow(ctk.CTk):
         op = self.morph_method_var.get()
         ks = int(self.morph_kernel.get())
         try:
-            self.controller.apply_morphology(op, kernel_size=max(1, ks), iterations=int(self.morph_iterations.get()))
+            base = self.get_pipeline_base()
+            if base is None:
+                return
+            result = svc_apply_morphology(base, op, intensity=self.app_state.intensity, iterations=int(self.morph_iterations.get()), kernel_size=max(1, ks))
+            self.image_model.processed = result
             self.update_preview_image(self.morphology_image_label)
         except Exception:
             pass
+
+    def get_pipeline_base(self):
+        if not self.image_model.original:
+            return None
+        try:
+            if self.pipeline.steps:
+                return self.pipeline_controller.run(self.image_model.original)
+            return self.image_model.original.copy()
+        except Exception:
+            return self.image_model.original.copy()
 
     # Exibição e estado
     def select_frame_by_name(self, name: str):
@@ -509,9 +582,24 @@ class MainWindow(ctk.CTk):
             else:
                 button.configure(fg_color="transparent")
 
-        for frame in [self.import_frame, self.color_frame, self.filter_frame, self.edge_frame, self.binary_frame, self.morphology_frame]:
+        for frame in [self.import_frame, self.color_frame, self.filter_frame, self.edge_frame, self.binary_frame, self.morphology_frame, self.pipeline_frame]:
             frame.grid_forget()
+        # Ao trocar de página, garantir que a imagem exibida reflita o vetor (se existir)
+        # sem alterar o estado original. Assim evitamos "salvar" sem clicar.
+        if self.image_model.original is not None and name != "pipeline":
+            try:
+                if self.pipeline.steps:
+                    result = self.pipeline_controller.run(self.image_model.original)
+                    self.image_model.processed = result.copy()
+                else:
+                    self.image_model.processed = self.image_model.original.copy()
+            except Exception:
+                self.image_model.processed = self.image_model.original.copy()
 
+        if name == "pipeline":
+            self.pipeline_frame.grid(row=0, column=0, sticky="nsew")
+            self.refresh_pipeline_list()
+            self.update_pipeline_preview()
         if name == "import":
             self.import_frame.grid(row=0, column=0, sticky="nsew")
         elif name == "color":
@@ -531,6 +619,200 @@ class MainWindow(ctk.CTk):
             self.update_preview_image(self.morphology_image_label)
 
         self.selected_frame_name = name
+
+    # ===== Pipeline helpers/actions =====
+    def refresh_pipeline_list(self):
+        for w in self.pipeline_list.winfo_children():
+            w.destroy()
+        if not self.pipeline.steps:
+            ctk.CTkLabel(self.pipeline_list, text="Nenhuma etapa adicionada.").grid(row=0, column=0, padx=10, pady=10)
+            return
+        for i, step in enumerate(self.pipeline.steps):
+            item = ctk.CTkFrame(self.pipeline_list, fg_color=("gray85", "gray25"))
+            item.grid(row=i, column=0, sticky="ew", padx=6, pady=4)
+            item.grid_columnconfigure(0, weight=1)
+            ctk.CTkLabel(item, text=step.display_text(), anchor="w").grid(row=0, column=0, sticky="ew", padx=10, pady=6)
+            ctk.CTkButton(item, text="↑", width=36, command=lambda idx=i: self.on_pipeline_move_up(idx)).grid(row=0, column=1, padx=4, pady=6)
+            ctk.CTkButton(item, text="↓", width=36, command=lambda idx=i: self.on_pipeline_move_down(idx)).grid(row=0, column=2, padx=4, pady=6)
+            ctk.CTkButton(item, text="Apagar", width=80, command=lambda idx=i: self.on_pipeline_delete(idx)).grid(row=0, column=3, padx=6, pady=6)
+
+    def on_pipeline_move_up(self, idx: int):
+        self.pipeline_controller.move_up(idx)
+        self.refresh_pipeline_list()
+        # Sincroniza a imagem processada com o vetor atual
+        if self.image_model.original:
+            try:
+                result = self.pipeline_controller.run(self.image_model.original) if self.pipeline.steps else self.image_model.original.copy()
+                self.image_model.processed = result
+            except Exception:
+                self.image_model.processed = self.image_model.original.copy()
+        self.update_pipeline_preview()
+
+    def on_pipeline_move_down(self, idx: int):
+        self.pipeline_controller.move_down(idx)
+        self.refresh_pipeline_list()
+        # Sincroniza a imagem processada com o vetor atual
+        if self.image_model.original:
+            try:
+                result = self.pipeline_controller.run(self.image_model.original) if self.pipeline.steps else self.image_model.original.copy()
+                self.image_model.processed = result
+            except Exception:
+                self.image_model.processed = self.image_model.original.copy()
+        self.update_pipeline_preview()
+
+    def on_pipeline_delete(self, idx: int):
+        self.pipeline_controller.delete_step(idx)
+        self.refresh_pipeline_list()
+        # Atualiza a imagem processada para refletir o novo estado do vetor
+        if self.image_model.original:
+            try:
+                if self.pipeline.steps:
+                    result = self.pipeline_controller.run(self.image_model.original)
+                    self.image_model.processed = result
+                else:
+                    self.image_model.processed = self.image_model.original.copy()
+            except Exception:
+                self.image_model.processed = self.image_model.original.copy()
+        self.update_pipeline_preview()
+
+    def on_pipeline_save(self):
+        # Salvar Vetor: salva apenas o snapshot das etapas (não altera a imagem original importada)
+        if not self.image_model.original:
+            messagebox.showwarning("Aviso", "Carregue uma imagem primeiro!")
+            return
+        try:
+            result = self.pipeline_controller.run(self.image_model.original)
+            # Atualiza apenas a visualização processada com o resultado do vetor
+            self.image_model.processed = result
+            # Salva snapshot do vetor (para permitir reverter)
+            self.pipeline_controller.save()
+            # Atualiza a UI
+            self.refresh_pipeline_list()
+            self.update_pipeline_preview()
+            messagebox.showinfo("Sucesso", "Vetor salvo! A imagem original permanece a mesma; o resultado será sempre calculado a partir dela.")
+        except Exception as e:
+            messagebox.showerror("Erro", f"Erro ao salvar vetor: {str(e)}")
+
+    def on_pipeline_revert(self):
+        # Reverter Vetor = reverter etapas para o snapshot salvo e atualizar a prévia
+        if not self.image_model.original:
+            messagebox.showwarning("Aviso", "Carregue uma imagem primeiro!")
+            return
+        try:
+            self.pipeline_controller.revert()
+            # Atualiza imagem processada com base no vetor revertido
+            if self.pipeline.steps:
+                result = self.pipeline_controller.run(self.image_model.original)
+                self.image_model.processed = result
+            else:
+                self.image_model.processed = self.image_model.original.copy()
+            self.refresh_pipeline_list()
+            self.update_pipeline_preview()
+            messagebox.showinfo("Revertido", "Vetor revertido para o último snapshot!")
+        except Exception as e:
+            messagebox.showerror("Erro", f"Erro ao reverter vetor: {str(e)}")
+
+    def on_pipeline_reset(self):
+        """Resetar (na aba do vetor) descarta alterações não salvas e volta ao snapshot."""
+        if not self.image_model.original:
+            messagebox.showwarning("Aviso", "Carregue uma imagem primeiro!")
+            return
+        try:
+            self.pipeline_controller.revert()
+            # Atualizar a imagem processada conforme o vetor revertido
+            if self.pipeline.steps:
+                result = self.pipeline_controller.run(self.image_model.original)
+                self.image_model.processed = result
+            else:
+                self.image_model.processed = self.image_model.original.copy()
+            self.refresh_pipeline_list()
+            self.update_pipeline_preview()
+            messagebox.showinfo("Resetado", "Alterações do vetor nesta aba foram descartadas.")
+        except Exception as e:
+            messagebox.showerror("Erro", f"Erro ao resetar vetor: {str(e)}")
+
+    # Removido: rodar vetor é intrínseco e a prévia já é atualizada automaticamente
+
+    # ===== Add steps from pages =====
+    def add_step_from_color(self):
+        method = self.color_method_var.get()
+        self.pipeline_controller.add_step("color", method, {})
+        self.refresh_pipeline_list()
+        self.update_pipeline_preview()
+
+    def add_step_from_filter(self):
+        method = self.filter_method_var.get()
+        params = {}
+        if method == "blur":
+            params = {"radius": int(self.blur_radius.get()), "iterations": int(self.filter_iterations.get())}
+        else:
+            params = {"iterations": int(self.filter_iterations.get())}
+        self.pipeline_controller.add_step("filter", method, params)
+        self.refresh_pipeline_list()
+        self.update_pipeline_preview()
+
+    def add_step_from_edge(self):
+        method = self.edge_method_var.get()
+        params = {}
+        if method == "canny":
+            params = {"low_threshold": int(self.canny_low.get()), "high_threshold": int(self.canny_high.get())}
+        else:
+            k = int(self.edge_ksize.get())
+            if k % 2 == 0:
+                k += 1
+            params = {"ksize": max(1, k)}
+            if method == "sobel":
+                try:
+                    params.update({"dx": int(self.sobel_dx.get()), "dy": int(self.sobel_dy.get())})
+                except Exception:
+                    pass
+        self.pipeline_controller.add_step("edge", method, params)
+        self.refresh_pipeline_list()
+        self.update_pipeline_preview()
+
+    def add_step_from_binary(self):
+        method = self.binary_method_var.get()
+        params = {}
+        if method == "simple":
+            params = {"threshold_value": int(self.binary_threshold.get())}
+        elif method == "adaptive":
+            bs = int(self.binary_block.get())
+            if bs % 2 == 0:
+                bs += 1
+            params = {"block_size": max(3, bs), "C": int(self.binary_C.get())}
+        self.pipeline_controller.add_step("binary", method, params)
+        self.refresh_pipeline_list()
+        self.update_pipeline_preview()
+
+    def add_step_from_morphology(self):
+        op = self.morph_method_var.get()
+        params = {"kernel_size": int(self.morph_kernel.get()), "iterations": int(self.morph_iterations.get())}
+        self.pipeline_controller.add_step("morphology", op, params)
+        self.refresh_pipeline_list()
+        self.update_pipeline_preview()
+
+    def update_pipeline_preview(self):
+        if not self.image_model.original:
+            # Se não houver imagem, apenas limpe o rótulo
+            self.pipeline_image_label.configure(image=None, text="Nenhuma imagem carregada")
+            return
+        if not self.pipeline.steps:
+            # Sem etapas, mostrar a imagem original
+            display_image = self.image_model.original.copy()
+            display_image.thumbnail(PREVIEW_MAX_SIZE, Image.Resampling.LANCZOS)
+            self._pipeline_ctk_image = ctk.CTkImage(light_image=display_image, dark_image=display_image, size=(display_image.width, display_image.height))
+            self.pipeline_image_label.configure(image=self._pipeline_ctk_image, text="")
+            return
+        try:
+            result = self.pipeline_controller.run(self.image_model.original)
+            # Renderiza no label do pipeline sem alterar o estado global processado
+            display_image = result.copy()
+            display_image.thumbnail(PREVIEW_MAX_SIZE, Image.Resampling.LANCZOS)
+            self._pipeline_ctk_image = ctk.CTkImage(light_image=display_image, dark_image=display_image, size=(display_image.width, display_image.height))
+            self.pipeline_image_label.configure(image=self._pipeline_ctk_image, text="")
+        except Exception:
+            # Em caso de erro, mantém a imagem atual
+            pass
 
     def open_image(self):
         filename = filedialog.askopenfilename(title='Selecionar imagem', initialdir=os.getcwd(), filetypes=SUPPORTED_IMAGE_TYPES)
@@ -622,14 +904,50 @@ class MainWindow(ctk.CTk):
 
     def save_modifications(self):
         if self.image_model.processed and self.image_model.original:
-            self.controller.save_modifications()
-            messagebox.showinfo("Sucesso", "Modificações salvas! Agora você pode aplicar outras transformações.")
+            # Antes de salvar, adiciona a etapa atual ao vetor
+            try:
+                if self.selected_frame_name == "color":
+                    self.add_step_from_color()
+                elif self.selected_frame_name == "filter":
+                    self.add_step_from_filter()
+                elif self.selected_frame_name == "edge":
+                    self.add_step_from_edge()
+                elif self.selected_frame_name == "binary":
+                    self.add_step_from_binary()
+                elif self.selected_frame_name == "morphology":
+                    self.add_step_from_morphology()
+            except Exception:
+                # Mesmo se falhar ao adicionar, prossegue o salvamento
+                pass
+            # Atualiza visualização com base no resultado do vetor atualizado
+            try:
+                result = self.pipeline_controller.run(self.image_model.original)
+                self.image_model.processed = result
+            except Exception:
+                # Se falhar, mantém o processado atual
+                pass
+            # Salva snapshot do vetor (não altera a imagem original carregada)
+            try:
+                self.pipeline_controller.save()
+            except Exception:
+                pass
+            # Atualiza UI do vetor se estiver aberto
+            if self.selected_frame_name == "pipeline":
+                self.refresh_pipeline_list()
+                self.update_pipeline_preview()
+            messagebox.showinfo("Sucesso", "Modificação adicionada ao vetor e salva no snapshot. A imagem original permanece inalterada.")
         else:
             messagebox.showwarning("Aviso", "Nenhuma modificação para salvar!")
 
     def reset_image(self):
         if self.image_model.original:
-            self.controller.reset_image()
+            # Resetar volta a prévia para o resultado atual do vetor (ou original se vazio)
+            try:
+                base = self.get_pipeline_base()
+                if base is not None:
+                    self.image_model.processed = base.copy()
+            except Exception:
+                self.image_model.processed = self.image_model.original.copy()
             if self.selected_frame_name == "color":
                 self.update_preview_image(self.color_image_label)
             elif self.selected_frame_name == "filter":
@@ -640,16 +958,31 @@ class MainWindow(ctk.CTk):
                 self.update_preview_image(self.binary_image_label)
             elif self.selected_frame_name == "morphology":
                 self.update_preview_image(self.morphology_image_label)
-            messagebox.showinfo("Sucesso", "Imagem resetada para o estado original!")
+            messagebox.showinfo("Sucesso", "Visualização resetada ao resultado do vetor (ou original se o vetor estiver vazio).")
 
     def export_image(self):
-        if not self.image_model.processed:
-            messagebox.showwarning("Aviso", "Nenhuma imagem para exportar!")
-            return
+        # Se estiver na aba do vetor, exporta o resultado do pipeline, sem mutar o estado global
+        if self.selected_frame_name == "pipeline":
+            if not self.image_model.original:
+                messagebox.showwarning("Aviso", "Nenhuma imagem para exportar!")
+                return
+            try:
+                result = self.pipeline_controller.run(self.image_model.original)
+            except Exception as e:
+                messagebox.showerror("Erro", f"Erro ao calcular o vetor: {str(e)}")
+                return
+            export_source = result
+        else:
+            if not self.image_model.processed:
+                messagebox.showwarning("Aviso", "Nenhuma imagem para exportar!")
+                return
+            export_source = self.image_model.processed
         filename = filedialog.asksaveasfilename(title='Salvar imagem', defaultextension='.png', filetypes=EXPORT_TYPES)
         if filename:
             try:
-                self.controller.export(filename)
+                # Exporta a imagem escolhida
+                from services.file_management.image_exporter import export_image as export_image_service
+                export_image_service(export_source, filename)
                 messagebox.showinfo("Sucesso", f"Imagem salva como {filename}")
             except Exception as e:
                 messagebox.showerror("Erro", f"Erro ao salvar: {str(e)}")
