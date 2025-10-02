@@ -10,6 +10,8 @@ def detect_edges(
     low_threshold: int | None = None,
     high_threshold: int | None = None,
     ksize: int | None = None,
+    dx: int | None = None,
+    dy: int | None = None,
 ) -> Image.Image:
     cv_image = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
     gray = cv2.cvtColor(cv_image, cv2.COLOR_BGR2GRAY)
@@ -22,10 +24,16 @@ def detect_edges(
         k = ksize if ksize is not None else max(3, int(3 * intensity))
         if k % 2 == 0:
             k += 1
-        sobelx = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=k)
-        sobely = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=k)
-        edges = np.sqrt(sobelx**2 + sobely**2)
-        edges = np.uint8(edges * intensity)
+        if dx is not None or dy is not None:
+            ddx = int(dx or 0)
+            ddy = int(dy or 0)
+            sob = cv2.Sobel(gray, cv2.CV_64F, ddx, ddy, ksize=k)
+            edges = np.uint8(np.absolute(sob))
+        else:
+            sobelx = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=k)
+            sobely = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=k)
+            mag = np.sqrt(sobelx**2 + sobely**2)
+            edges = np.uint8(np.clip(mag, 0, 255))
     elif method == "laplacian":
         k = ksize if ksize is not None else max(3, int(3 * intensity))
         if k % 2 == 0:

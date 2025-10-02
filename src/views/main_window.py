@@ -203,18 +203,8 @@ class MainWindow(ctk.CTk):
             w.destroy()
         method = self.color_method_var.get()
 
-        # Iterations sempre permitido em cor (mantém compatibilidade)
-        ctk.CTkLabel(self.color_params_frame, text="Repetições").grid(row=0, column=0, padx=5, pady=5)
-        self.color_iterations = ctk.IntVar(value=1)
-        it_slider = ctk.CTkSlider(self.color_params_frame, from_=1, to=10, number_of_steps=9, variable=self.color_iterations, command=lambda v: self.on_color_param_change())
-        it_slider.grid(row=0, column=1, sticky="ew", padx=5)
-
-        # Intensidade só para grayscale/invert (mistura/blend)
-        if method in ("grayscale", "invert"):
-            ctk.CTkLabel(self.color_params_frame, text="Intensidade").grid(row=0, column=2, padx=5, pady=5)
-            self.color_intensity = ctk.DoubleVar(value=1.0)
-            in_slider = ctk.CTkSlider(self.color_params_frame, from_=0.1, to=3.0, number_of_steps=29, variable=self.color_intensity, command=lambda v: self.on_color_param_change())
-            in_slider.grid(row=0, column=3, sticky="ew", padx=5)
+        # Conversões são determinísticas: sem intensidade nem repetições
+        ctk.CTkLabel(self.color_params_frame, text="Sem parâmetros para conversão de cor.").grid(row=0, column=0, padx=5, pady=5)
 
         self.on_color_param_change()
 
@@ -222,10 +212,8 @@ class MainWindow(ctk.CTk):
         if not self.image_model.original:
             return
         method = self.color_method_var.get()
-        intensity = float(self.color_intensity.get()) if hasattr(self, 'color_intensity') else 1.0
-        iterations = int(self.color_iterations.get()) if hasattr(self, 'color_iterations') else 1
         try:
-            self.controller.convert_color(method, intensity=intensity, iterations=iterations)
+            self.controller.convert_color(method)
             self.update_preview_image(self.color_image_label)
         except Exception:
             pass
@@ -298,7 +286,7 @@ class MainWindow(ctk.CTk):
 
         method = self.edge_method_var.get()
 
-        if method == "canny":
+        if method == "canny":  # sem repetições
             ctk.CTkLabel(self.edge_params_frame, text="Low Threshold").grid(row=0, column=0, padx=5, pady=5)
             self.canny_low = ctk.IntVar(value=int(50 * self.app_state.intensity))
             low_slider = ctk.CTkSlider(self.edge_params_frame, from_=0, to=255, number_of_steps=255, variable=self.canny_low, command=lambda v: self.on_edge_param_change())
@@ -308,7 +296,7 @@ class MainWindow(ctk.CTk):
             self.canny_high = ctk.IntVar(value=int(150 * self.app_state.intensity))
             high_slider = ctk.CTkSlider(self.edge_params_frame, from_=0, to=255, number_of_steps=255, variable=self.canny_high, command=lambda v: self.on_edge_param_change())
             high_slider.grid(row=0, column=3, sticky="ew", padx=5)
-        else:
+        else:  # sobel/laplacian, sem repetições
             ctk.CTkLabel(self.edge_params_frame, text="Kernel Size").grid(row=0, column=0, padx=5, pady=5)
             default_k = max(3, int(3 * self.app_state.intensity))
             if default_k % 2 == 0:
@@ -316,6 +304,17 @@ class MainWindow(ctk.CTk):
             self.edge_ksize = ctk.IntVar(value=default_k)
             k_slider = ctk.CTkSlider(self.edge_params_frame, from_=1, to=31, number_of_steps=30, variable=self.edge_ksize, command=lambda v: self.on_edge_param_change())
             k_slider.grid(row=0, column=1, sticky="ew", padx=5)
+
+            if method == "sobel":
+                ctk.CTkLabel(self.edge_params_frame, text="dx").grid(row=0, column=2, padx=5, pady=5)
+                self.sobel_dx = ctk.IntVar(value=1)
+                dx_opt = ctk.CTkOptionMenu(self.edge_params_frame, values=["0", "1"], variable=self.sobel_dx, command=lambda _: self.on_edge_param_change())
+                dx_opt.grid(row=0, column=3, padx=5, pady=5)
+
+                ctk.CTkLabel(self.edge_params_frame, text="dy").grid(row=0, column=4, padx=5, pady=5)
+                self.sobel_dy = ctk.IntVar(value=0)
+                dy_opt = ctk.CTkOptionMenu(self.edge_params_frame, values=["0", "1"], variable=self.sobel_dy, command=lambda _: self.on_edge_param_change())
+                dy_opt.grid(row=0, column=5, padx=5, pady=5)
 
         # Live update using current method and params
         self.on_edge_param_change()
@@ -333,6 +332,13 @@ class MainWindow(ctk.CTk):
             if k % 2 == 0:
                 k += 1
             kwargs = {"ksize": max(1, k)}
+            if method == "sobel":
+                try:
+                    dx = int(self.sobel_dx.get())
+                    dy = int(self.sobel_dy.get())
+                except Exception:
+                    dx, dy = 1, 0
+                kwargs.update({"dx": dx, "dy": dy})
         try:
             self.controller.detect_edges(method, **kwargs)
             self.update_preview_image(self.edge_image_label)
