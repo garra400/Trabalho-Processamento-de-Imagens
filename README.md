@@ -1,9 +1,5 @@
 # Processamento de Imagens
 
-## Estrutura do Projeto
-
-Este projeto é uma versão modular do `codigofinal3.py`, organizando o código em uma arquitetura limpa e escalável.
-
 ### Organização das Pastas
 
 ```
