@@ -22,14 +22,12 @@ def main():
         ctk.set_default_color_theme("blue")
         
         # Importar e executar a aplicação principal
-        # Primeiro, vamos tentar importar de views se existir
         try:
-            from views.main_window import MainWindow
+            from src.views.main_window import MainWindow
             app = MainWindow()
-        except ImportError:
-            # Se não existir, criar uma aplicação básica
-            print("Módulo views.main_window não encontrado.")
-            print("Criando aplicação básica...")
+        except Exception as e:
+            print(f"Erro ao iniciar MainWindow: {e}")
+            print("Usando aplicação básica como fallback...")
             from src.views.basic_app import BasicImageApp
             app = BasicImageApp()
         
