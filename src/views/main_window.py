@@ -180,10 +180,24 @@ class MainWindow(ctk.CTk):
     def on_intensity_change(self, value):
         self.app_state.intensity = float(value)
         self.intensity_label.configure(text=f"{value:.1f}")
+        # Live refresh for pages with dynamic params
+        if getattr(self, 'selected_frame_name', None) == "edge":
+            self.on_edge_param_change()
+        elif getattr(self, 'selected_frame_name', None) == "binary":
+            self.on_binary_param_change()
+        elif getattr(self, 'selected_frame_name', None) == "filter":
+            self.on_filter_param_change()
+        elif getattr(self, 'selected_frame_name', None) == "morphology":
+            self.on_morph_param_change()
 
     def on_iterations_change(self, value):
         self.app_state.iterations = int(value)
         self.iterations_label.configure(text=f"{int(value)}")
+        # Some techniques respond to iteration changes (filters/morphology)
+        if getattr(self, 'selected_frame_name', None) == "filter":
+            self.on_filter_param_change()
+        elif getattr(self, 'selected_frame_name', None) == "morphology":
+            self.on_morph_param_change()
 
     def setup_processing_page(self, frame, title, controls_func):
         frame.grid_rowconfigure(0, weight=1)
@@ -229,49 +243,228 @@ class MainWindow(ctk.CTk):
 
     def setup_filter_page(self):
         def create_filter_controls(parent):
-            parent.grid_columnconfigure((0, 1, 2, 3), weight=1)
+            parent.grid_columnconfigure((0, 1, 2, 3, 4), weight=1)
             self.create_intensity_toolbar(parent)
-            ctk.CTkLabel(parent, text="Filtros:", font=ctk.CTkFont(weight="bold")).grid(row=1, column=0, columnspan=4, pady=(10, 5))
-            ctk.CTkButton(parent, text="Blur", command=lambda: self.on_apply_filter("blur")).grid(row=2, column=0, padx=5, pady=5)
-            ctk.CTkButton(parent, text="Sharpen", command=lambda: self.on_apply_filter("sharpen")).grid(row=2, column=1, padx=5, pady=5)
-            ctk.CTkButton(parent, text="Emboss", command=lambda: self.on_apply_filter("emboss")).grid(row=2, column=2, padx=5, pady=5)
-            ctk.CTkButton(parent, text="Smooth", command=lambda: self.on_apply_filter("smooth")).grid(row=2, column=3, padx=5, pady=5)
+            ctk.CTkLabel(parent, text="Filtros:", font=ctk.CTkFont(weight="bold")).grid(row=1, column=0, columnspan=5, pady=(10, 5))
+
+            ctk.CTkLabel(parent, text="Técnica:").grid(row=2, column=0, padx=5, pady=5, sticky="e")
+            self.filter_method_var = ctk.StringVar(value="blur")
+            self.filter_method_option = ctk.CTkOptionMenu(parent, values=["blur", "sharpen", "emboss", "smooth"], variable=self.filter_method_var, command=lambda _: self.update_filter_controls())
+            self.filter_method_option.grid(row=2, column=1, padx=5, pady=5, sticky="w")
+
+            self.filter_params_frame = ctk.CTkFrame(parent)
+            self.filter_params_frame.grid(row=3, column=0, columnspan=5, sticky="ew", padx=10, pady=5)
+            self.filter_params_frame.grid_columnconfigure((0, 1, 2, 3, 4), weight=1)
+
+            self.update_filter_controls()
 
         self.filter_image_area, self.filter_image_label = self.setup_processing_page(self.filter_frame, "Filtros", create_filter_controls)
 
     def setup_edge_page(self):
         def create_edge_controls(parent):
-            parent.grid_columnconfigure((0, 1, 2), weight=1)
+            parent.grid_columnconfigure((0, 1, 2, 3, 4), weight=1)
             self.create_intensity_toolbar(parent)
-            ctk.CTkLabel(parent, text="Detector de Borda:", font=ctk.CTkFont(weight="bold")).grid(row=1, column=0, columnspan=3, pady=(10, 5))
-            ctk.CTkButton(parent, text="Canny", command=lambda: self.on_detect_edges("canny")).grid(row=2, column=0, padx=5, pady=5)
-            ctk.CTkButton(parent, text="Sobel", command=lambda: self.on_detect_edges("sobel")).grid(row=2, column=1, padx=5, pady=5)
-            ctk.CTkButton(parent, text="Laplacian", command=lambda: self.on_detect_edges("laplacian")).grid(row=2, column=2, padx=5, pady=5)
+
+            ctk.CTkLabel(parent, text="Detector de Borda:", font=ctk.CTkFont(weight="bold")).grid(row=1, column=0, columnspan=5, pady=(10, 5))
+
+            # Seletor de técnica
+            ctk.CTkLabel(parent, text="Técnica:").grid(row=2, column=0, padx=5, pady=5, sticky="e")
+            self.edge_method_var = ctk.StringVar(value="canny")
+            self.edge_method_option = ctk.CTkOptionMenu(parent, values=["canny", "sobel", "laplacian"], variable=self.edge_method_var, command=lambda _: self.update_edge_controls())
+            self.edge_method_option.grid(row=2, column=1, padx=5, pady=5, sticky="w")
+
+            # Parâmetros dinâmicos
+            self.edge_params_frame = ctk.CTkFrame(parent)
+            self.edge_params_frame.grid(row=3, column=0, columnspan=5, sticky="ew", padx=10, pady=5)
+            self.edge_params_frame.grid_columnconfigure((0, 1, 2, 3, 4), weight=1)
+
+            # Render inicial
+            self.update_edge_controls()
 
         self.edge_image_area, self.edge_image_label = self.setup_processing_page(self.edge_frame, "Detector de Borda", create_edge_controls)
 
     def setup_binary_page(self):
         def create_binary_controls(parent):
-            parent.grid_columnconfigure((0, 1, 2), weight=1)
+            parent.grid_columnconfigure((0, 1, 2, 3, 4), weight=1)
             self.create_intensity_toolbar(parent)
-            ctk.CTkLabel(parent, text="Binarização:", font=ctk.CTkFont(weight="bold")).grid(row=1, column=0, columnspan=3, pady=(10, 5))
-            ctk.CTkButton(parent, text="Threshold Simples", command=lambda: self.on_binarize("simple")).grid(row=2, column=0, padx=5, pady=5)
-            ctk.CTkButton(parent, text="Threshold Adaptativo", command=lambda: self.on_binarize("adaptive")).grid(row=2, column=1, padx=5, pady=5)
-            ctk.CTkButton(parent, text="Otsu", command=lambda: self.on_binarize("otsu")).grid(row=2, column=2, padx=5, pady=5)
+            ctk.CTkLabel(parent, text="Binarização:", font=ctk.CTkFont(weight="bold")).grid(row=1, column=0, columnspan=5, pady=(10, 5))
+
+            ctk.CTkLabel(parent, text="Técnica:").grid(row=2, column=0, padx=5, pady=5, sticky="e")
+            self.binary_method_var = ctk.StringVar(value="simple")
+            self.binary_method_option = ctk.CTkOptionMenu(parent, values=["simple", "adaptive", "otsu"], variable=self.binary_method_var, command=lambda _: self.update_binary_controls())
+            self.binary_method_option.grid(row=2, column=1, padx=5, pady=5, sticky="w")
+
+            self.binary_params_frame = ctk.CTkFrame(parent)
+            self.binary_params_frame.grid(row=3, column=0, columnspan=5, sticky="ew", padx=10, pady=5)
+            self.binary_params_frame.grid_columnconfigure((0, 1, 2, 3, 4), weight=1)
+
+            self.update_binary_controls()
 
         self.binary_image_area, self.binary_image_label = self.setup_processing_page(self.binary_frame, "Binarização", create_binary_controls)
 
+    # Edge dynamic controls and live update
+    def update_edge_controls(self):
+        for w in self.edge_params_frame.winfo_children():
+            w.destroy()
+
+        method = self.edge_method_var.get()
+
+        if method == "canny":
+            ctk.CTkLabel(self.edge_params_frame, text="Low Threshold").grid(row=0, column=0, padx=5, pady=5)
+            self.canny_low = ctk.IntVar(value=int(50 * self.app_state.intensity))
+            low_slider = ctk.CTkSlider(self.edge_params_frame, from_=0, to=255, number_of_steps=255, variable=self.canny_low, command=lambda v: self.on_edge_param_change())
+            low_slider.grid(row=0, column=1, sticky="ew", padx=5)
+
+            ctk.CTkLabel(self.edge_params_frame, text="High Threshold").grid(row=0, column=2, padx=5, pady=5)
+            self.canny_high = ctk.IntVar(value=int(150 * self.app_state.intensity))
+            high_slider = ctk.CTkSlider(self.edge_params_frame, from_=0, to=255, number_of_steps=255, variable=self.canny_high, command=lambda v: self.on_edge_param_change())
+            high_slider.grid(row=0, column=3, sticky="ew", padx=5)
+        else:
+            ctk.CTkLabel(self.edge_params_frame, text="Kernel Size").grid(row=0, column=0, padx=5, pady=5)
+            default_k = max(3, int(3 * self.app_state.intensity))
+            if default_k % 2 == 0:
+                default_k += 1
+            self.edge_ksize = ctk.IntVar(value=default_k)
+            k_slider = ctk.CTkSlider(self.edge_params_frame, from_=1, to=31, number_of_steps=30, variable=self.edge_ksize, command=lambda v: self.on_edge_param_change())
+            k_slider.grid(row=0, column=1, sticky="ew", padx=5)
+
+        # Live update using current method and params
+        self.on_edge_param_change()
+
+    def on_edge_param_change(self):
+        if not self.image_model.original:
+            return
+        method = self.edge_method_var.get()
+        kwargs = {}
+        if method == "canny":
+            kwargs = {"low_threshold": int(self.canny_low.get()), "high_threshold": int(self.canny_high.get())}
+        else:
+            # Ensure odd kernel
+            k = int(self.edge_ksize.get())
+            if k % 2 == 0:
+                k += 1
+            kwargs = {"ksize": max(1, k)}
+        try:
+            self.controller.detect_edges(method, **kwargs)
+            self.update_preview_image(self.edge_image_label)
+        except Exception:
+            pass
+
+    # Binary dynamic controls and live update
+    def update_binary_controls(self):
+        for w in self.binary_params_frame.winfo_children():
+            w.destroy()
+
+        method = self.binary_method_var.get()
+
+        if method == "simple":
+            ctk.CTkLabel(self.binary_params_frame, text="Threshold").grid(row=0, column=0, padx=5, pady=5)
+            self.binary_threshold = ctk.IntVar(value=int(127 * self.app_state.intensity))
+            t_slider = ctk.CTkSlider(self.binary_params_frame, from_=0, to=255, number_of_steps=255, variable=self.binary_threshold, command=lambda v: self.on_binary_param_change())
+            t_slider.grid(row=0, column=1, sticky="ew", padx=5)
+        elif method == "adaptive":
+            ctk.CTkLabel(self.binary_params_frame, text="Block Size").grid(row=0, column=0, padx=5, pady=5)
+            default_bs = max(3, int(11 * self.app_state.intensity))
+            if default_bs % 2 == 0:
+                default_bs += 1
+            self.binary_block = ctk.IntVar(value=default_bs)
+            b_slider = ctk.CTkSlider(self.binary_params_frame, from_=3, to=51, number_of_steps=24, variable=self.binary_block, command=lambda v: self.on_binary_param_change())
+            b_slider.grid(row=0, column=1, sticky="ew", padx=5)
+
+            ctk.CTkLabel(self.binary_params_frame, text="C").grid(row=0, column=2, padx=5, pady=5)
+            self.binary_C = ctk.IntVar(value=2)
+            c_slider = ctk.CTkSlider(self.binary_params_frame, from_=-20, to=20, number_of_steps=40, variable=self.binary_C, command=lambda v: self.on_binary_param_change())
+            c_slider.grid(row=0, column=3, sticky="ew", padx=5)
+        else:
+            ctk.CTkLabel(self.binary_params_frame, text="Sem parâmetros para Otsu").grid(row=0, column=0, padx=5, pady=5)
+
+        self.on_binary_param_change()
+
+    def on_binary_param_change(self):
+        if not self.image_model.original:
+            return
+        method = self.binary_method_var.get()
+        kwargs = {}
+        if method == "simple":
+            kwargs = {"threshold_value": int(self.binary_threshold.get())}
+        elif method == "adaptive":
+            bs = int(self.binary_block.get())
+            if bs % 2 == 0:
+                bs += 1
+            kwargs = {"block_size": max(3, bs), "C": int(self.binary_C.get())}
+        try:
+            self.controller.binarize(method, **kwargs)
+            self.update_preview_image(self.binary_image_label)
+        except Exception:
+            pass
+
     def setup_morphology_page(self):
         def create_morphology_controls(parent):
-            parent.grid_columnconfigure((0, 1, 2, 3), weight=1)
+            parent.grid_columnconfigure((0, 1, 2, 3, 4), weight=1)
             self.create_intensity_toolbar(parent)
-            ctk.CTkLabel(parent, text="Morfologia Matemática:", font=ctk.CTkFont(weight="bold")).grid(row=1, column=0, columnspan=4, pady=(10, 5))
-            ctk.CTkButton(parent, text="Erosão", command=lambda: self.on_apply_morphology("erosion")).grid(row=2, column=0, padx=5, pady=5)
-            ctk.CTkButton(parent, text="Dilatação", command=lambda: self.on_apply_morphology("dilation")).grid(row=2, column=1, padx=5, pady=5)
-            ctk.CTkButton(parent, text="Abertura", command=lambda: self.on_apply_morphology("opening")).grid(row=2, column=2, padx=5, pady=5)
-            ctk.CTkButton(parent, text="Fechamento", command=lambda: self.on_apply_morphology("closing")).grid(row=2, column=3, padx=5, pady=5)
+            ctk.CTkLabel(parent, text="Morfologia Matemática:", font=ctk.CTkFont(weight="bold")).grid(row=1, column=0, columnspan=5, pady=(10, 5))
+
+            ctk.CTkLabel(parent, text="Operação:").grid(row=2, column=0, padx=5, pady=5, sticky="e")
+            self.morph_method_var = ctk.StringVar(value="erosion")
+            self.morph_method_option = ctk.CTkOptionMenu(parent, values=["erosion", "dilation", "opening", "closing"], variable=self.morph_method_var, command=lambda _: self.update_morphology_controls())
+            self.morph_method_option.grid(row=2, column=1, padx=5, pady=5, sticky="w")
+
+            self.morph_params_frame = ctk.CTkFrame(parent)
+            self.morph_params_frame.grid(row=3, column=0, columnspan=5, sticky="ew", padx=10, pady=5)
+            self.morph_params_frame.grid_columnconfigure((0, 1, 2, 3, 4), weight=1)
+
+            self.update_morphology_controls()
 
         self.morphology_image_area, self.morphology_image_label = self.setup_processing_page(self.morphology_frame, "Morfologia Matemática", create_morphology_controls)
+
+    # Filter dynamic controls/live update
+    def update_filter_controls(self):
+        for w in self.filter_params_frame.winfo_children():
+            w.destroy()
+        method = self.filter_method_var.get()
+        if method == "blur":
+            ctk.CTkLabel(self.filter_params_frame, text="Raio").grid(row=0, column=0, padx=5, pady=5)
+            self.blur_radius = ctk.IntVar(value=max(1, int(self.app_state.intensity * 2)))
+            r_slider = ctk.CTkSlider(self.filter_params_frame, from_=1, to=50, number_of_steps=49, variable=self.blur_radius, command=lambda v: self.on_filter_param_change())
+            r_slider.grid(row=0, column=1, sticky="ew", padx=5)
+        else:
+            ctk.CTkLabel(self.filter_params_frame, text="Sem parâmetros").grid(row=0, column=0, padx=5, pady=5)
+        self.on_filter_param_change()
+
+    def on_filter_param_change(self):
+        if not self.image_model.original:
+            return
+        method = self.filter_method_var.get()
+        kwargs = {}
+        if method == "blur":
+            kwargs = {"radius": int(self.blur_radius.get())}
+        try:
+            self.controller.apply_filter(method, **kwargs)
+            self.update_preview_image(self.filter_image_label)
+        except Exception:
+            pass
+
+    # Morphology dynamic controls/live update
+    def update_morphology_controls(self):
+        for w in self.morph_params_frame.winfo_children():
+            w.destroy()
+        ctk.CTkLabel(self.morph_params_frame, text="Kernel Size").grid(row=0, column=0, padx=5, pady=5)
+        default_ks = max(3, int(5 * self.app_state.intensity))
+        self.morph_kernel = ctk.IntVar(value=default_ks)
+        ks_slider = ctk.CTkSlider(self.morph_params_frame, from_=1, to=51, number_of_steps=50, variable=self.morph_kernel, command=lambda v: self.on_morph_param_change())
+        ks_slider.grid(row=0, column=1, sticky="ew", padx=5)
+        self.on_morph_param_change()
+
+    def on_morph_param_change(self):
+        if not self.image_model.original:
+            return
+        op = self.morph_method_var.get()
+        ks = int(self.morph_kernel.get())
+        try:
+            self.controller.apply_morphology(op, kernel_size=max(1, ks))
+            self.update_preview_image(self.morphology_image_label)
+        except Exception:
+            pass
 
     # Exibição e estado
     def select_frame_by_name(self, name: str):
@@ -370,24 +563,17 @@ class MainWindow(ctk.CTk):
             messagebox.showerror("Erro", f"Erro no filtro: {str(e)}")
 
     def on_detect_edges(self, method: str):
+        # Mantido para compatibilidade; agora usamos os controles dinâmicos
         if not self.image_model.original:
             messagebox.showwarning("Aviso", "Carregue uma imagem primeiro!")
             return
-        try:
-            self.controller.detect_edges(method)
-            self.update_preview_image(self.edge_image_label)
-        except Exception as e:
-            messagebox.showerror("Erro", f"Erro na detecção de bordas: {str(e)}")
+        self.on_edge_param_change()
 
     def on_binarize(self, method: str):
         if not self.image_model.original:
             messagebox.showwarning("Aviso", "Carregue uma imagem primeiro!")
             return
-        try:
-            self.controller.binarize(method)
-            self.update_preview_image(self.binary_image_label)
-        except Exception as e:
-            messagebox.showerror("Erro", f"Erro na binarização: {str(e)}")
+        self.on_binary_param_change()
 
     def on_apply_morphology(self, operation: str):
         if not self.image_model.original:

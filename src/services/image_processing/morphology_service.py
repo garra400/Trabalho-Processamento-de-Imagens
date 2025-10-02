@@ -3,12 +3,18 @@ import numpy as np
 import cv2
 
 
-def apply_morphology(image: Image.Image, operation: str, intensity: float, iterations: int) -> Image.Image:
+def apply_morphology(
+    image: Image.Image,
+    operation: str,
+    intensity: float,
+    iterations: int,
+    kernel_size: int | None = None,
+) -> Image.Image:
     gray = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2GRAY)
     _, binary = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY)
 
-    kernel_size = max(3, int(5 * intensity))
-    kernel = np.ones((kernel_size, kernel_size), np.uint8)
+    ks = kernel_size if kernel_size is not None else max(3, int(5 * intensity))
+    kernel = np.ones((ks, ks), np.uint8)
 
     result = binary
     for _ in range(iterations):

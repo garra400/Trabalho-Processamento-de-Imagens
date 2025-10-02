@@ -1,12 +1,18 @@
 from PIL import Image, ImageFilter
 
 
-def apply_filter(image: Image.Image, filter_type: str, intensity: float, iterations: int) -> Image.Image:
+def apply_filter(
+    image: Image.Image,
+    filter_type: str,
+    intensity: float,
+    iterations: int,
+    radius: int | None = None,
+) -> Image.Image:
     result_image = image.copy()
     for _ in range(iterations):
         if filter_type == "blur":
-            radius = max(1, int(intensity * 2))
-            filtered_image = result_image.filter(ImageFilter.GaussianBlur(radius=radius))
+            r = radius if radius is not None else max(1, int(intensity * 2))
+            filtered_image = result_image.filter(ImageFilter.GaussianBlur(radius=r))
         elif filter_type == "sharpen":
             filtered_image = result_image.filter(ImageFilter.SHARPEN)
             if intensity != 1.0:

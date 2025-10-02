@@ -39,7 +39,7 @@ class ImageController:
             self.state.iterations,
         )
 
-    def apply_filter(self, filter_type: str) -> None:
+    def apply_filter(self, filter_type: str, **kwargs) -> None:
         if self.image_model.original is None:
             raise ValueError("Nenhuma imagem carregada")
         self.image_model.processed = svc_apply_filter(
@@ -47,27 +47,30 @@ class ImageController:
             filter_type,
             self.state.intensity,
             self.state.iterations,
+            **kwargs,
         )
 
-    def detect_edges(self, method: str) -> None:
+    def detect_edges(self, method: str, **kwargs) -> None:
         if self.image_model.original is None:
             raise ValueError("Nenhuma imagem carregada")
         self.image_model.processed = svc_detect_edges(
             self.image_model.original.copy(),
             method,
             self.state.intensity,
+            **kwargs,
         )
 
-    def binarize(self, method: str) -> None:
+    def binarize(self, method: str, **kwargs) -> None:
         if self.image_model.original is None:
             raise ValueError("Nenhuma imagem carregada")
         self.image_model.processed = svc_binarize(
             self.image_model.original.copy(),
             method,
             self.state.intensity,
+            **kwargs,
         )
 
-    def apply_morphology(self, operation: str) -> None:
+    def apply_morphology(self, operation: str, **kwargs) -> None:
         if self.image_model.original is None:
             raise ValueError("Nenhuma imagem carregada")
         self.image_model.processed = svc_apply_morphology(
@@ -75,6 +78,7 @@ class ImageController:
             operation,
             self.state.intensity,
             self.state.iterations,
+            **kwargs,
         )
 
     # Estado
