@@ -82,10 +82,3 @@ Nas abas de operação (Cor, Filtros, Bordas, Binarização, Morfologia):
 4. **Páginas**: Adicione novas páginas em `src/views/pages/`
 5. **Utilitários**: Funções auxiliares em `src/utils/`
 
-### Vantagens da Arquitetura Modular
-
-- **Separação de Responsabilidades**: Cada módulo tem uma função específica
-- **Reutilização**: Componentes podem ser reutilizados
-- **Manutenibilidade**: Código mais fácil de manter e debuggar
-- **Testabilidade**: Cada módulo pode ser testado independentemente
-- **Escalabilidade**: Fácil adicionar novas funcionalidades
