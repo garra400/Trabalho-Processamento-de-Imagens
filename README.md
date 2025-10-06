@@ -2,7 +2,7 @@
 
 Aplicativo de processamento de imagens com interface em CustomTkinter, arquitetura modular e um Vetor de Modificações (pipeline) que encadeia transformações de forma pura a partir da imagem original.
 
-## Organização das Pastas (real)
+## Organização das Pastas
 
 ```
 Trabalho-Processamento-de-Imagens/
